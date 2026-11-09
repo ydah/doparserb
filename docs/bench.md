@@ -66,3 +66,14 @@ On 2026-11-10, the richer renderer and continuous playback animation were measur
 | Event bursts and 128 sidecars | 1.424 ms | 2.776 ms | 4.403 ms | 5 ms |
 
 The event-burst run exceeds the maximum target by 1.810 ms; the sidecar run meets it. These are single runs including scheduling and PTY-reader costs, not universal latency guarantees. All samples are retained in [bench-relay-arcade.json](bench-relay-arcade.json) and [bench-relay-sidecars-arcade.json](bench-relay-sidecars-arcade.json). Earlier measurements above remain unchanged. The C runtime and generation collector were not modified or rebenchmarked for this presentation change.
+
+### Playback choreography refresh
+
+The later 2026-11-10 revision gives live highlights longer holds and aligns intermediate frames with scene impacts. The same 100-line relay benchmark was run after tests and recording jobs stopped; both runs preserved every child-output line.
+
+| Case | Median | p95 | Maximum | Maximum target |
+| --- | ---: | ---: | ---: | ---: |
+| Event bursts | 1.472 ms | 2.701 ms | 3.396 ms | 5 ms |
+| Event bursts and 128 sidecars | 1.453 ms | 2.296 ms | 3.062 ms | 5 ms |
+
+Both maxima meet the target in these runs. Raw samples are in [bench-relay-choreography.json](bench-relay-choreography.json) and [bench-relay-sidecars-choreography.json](bench-relay-sidecars-choreography.json). Earlier deviations remain above; these single-run samples do not establish a universal bound. Longer live highlights can fold more visual events under sustained load, while the pending queue remains bounded and full replay keeps its requested speed. C transport and scoring probabilities were unchanged.

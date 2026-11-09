@@ -2,9 +2,11 @@
 
 A parser generator built on [lrama](https://github.com/ruby/lrama), with terminal shows for generating and running parsers. Watch states form, conflicts resolve, and C code get forged. Use `play` to see shifts, reductions, chains, error recovery, and a growing stack tower.
 
-Effects use [dopairb](https://github.com/ko1/dopairb)'s terminal and sound components: large rainbow lettering, original ASCII llamas and conflict bosses, forge sparks, shockwaves, fireworks, and spinning jackpot reels. Playback animates colored stack blocks between events. Original diagnostics, program output, and exit statuses remain intact.
+Effects use [dopairb](https://github.com/ko1/dopairb)'s terminal and sound components: large rainbow lettering, original ASCII llamas and conflict bosses, forge sparks, shockwaves, and fireworks. During playback, token blocks drop and land, reduction blocks collide and fuse, and a repair gantry reconnects a broken bridge. Jackpot reels stop one at a time before revealing 777, coin rain, and the points earned. Original diagnostics, program output, and exit statuses remain intact.
 
-![Generation and playback effects rendered at 80 columns](docs/visual-preview.png)
+![Animated shifts, reductions, recovery, and jackpot rewards](docs/play-choreography.gif)
+
+See the [generation and playback still previews](docs/visual-preview.png) for more scenes.
 
 ```console
 $ bundle exec ruby exe/doparserb -d grammar.y -o parser.c

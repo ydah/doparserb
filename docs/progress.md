@@ -119,6 +119,15 @@
 - Performance: relay medians were 1.459 ms and 1.424 ms with 128 sidecars; maxima were 6.810 ms and 4.403 ms. The first exceeds the 5 ms target by 1.810 ms. No child output was lost. Raw samples and limitations are in [bench.md](bench.md#arcade-presentation-refresh).
 - Remaining checks: physical terminal/font combinations, physical audio, and Linux were not verified locally. The generated C runtime and its documented backpressure cutoff remain unchanged.
 
+## Playback choreography refresh
+
+- Changes: replaced the generic Shift, Reduce, and Recovery mascots with a falling token prism, colliding RHS blocks that reveal their LHS result, and a repair gantry that reconnects a broken bridge. Preparation, impact, and reward phases follow dopairb's Hit, Clash, and Jackpot sequences. Core hit sounds and optional flashes meet the impact. The chain meter points to actual configured bonuses.
+- Rare rewards: critical hits reveal their multiplier after a slash; jackpot reels stop separately before coin rain, a large 777, and counted points. Live highlights have readable holds; the finishing reel preserves its one-to-two-second budget and favors the strongest scene. Full replay retains its speed setting. Demo snapshots now match their parser actions and show nonzero rare rewards.
+- Validation: 537 tests and 10,475 assertions passed in 159.962 seconds with zero failures, errors, pendings, omissions, or notifications. The unchanged 10,000-input C fuzz test was excluded. New regressions cover actual action phases, next-token semantics, delayed rewards and sounds, flash timing, glyph variants, bounded replay, output interruption, and demo snapshots. Independent review found no remaining blocker.
+- Visual checks: inspected twenty actual rendered frames and the [animated preview](play-choreography.gif), fixing clipped operand edges and an oversized payoff title. The [frame sequence](play-choreography.png), general preview, and three affected recordings are refreshed. Recordings pass JSON, timestamp, control-sequence, and screen-bound checks.
+- Performance: relay maxima were 3.396 ms and 3.062 ms with 128 sidecars, below the 5 ms target in these runs, with no child output lost. [Measurements and earlier deviations](bench.md#playback-choreography-refresh) are retained. Longer live highlights may fold more visual events under sustained load; queue bounds, C transport, and scoring probabilities are unchanged.
+- Remaining checks: physical audio, other terminal/font combinations, and Linux were not verified locally.
+
 ## Final acceptance checklist
 
 - [x] Full-off compatibility: the 13-grammar × 13-option golden matrix matches pinned lrama artifacts, diagnostics, and statuses, using only the approved comparison normalization.

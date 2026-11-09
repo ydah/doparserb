@@ -8,6 +8,12 @@ module Doparserb
       HIGHLIGHT_FRAMES = 12
       ANIMATION_DURATION = 0.35
       DEMO_DURATION = 0.55
+      SCENE_DURATIONS = {
+        shift: 0.65, reduce: 0.7, chain: 0.85, from_nothing: 0.7,
+        recovery: 0.85, repair_plan: 0.85, inserted: 0.7, auto_repair: 0.85,
+        tower_milestone: 0.9, token_milestone: 1.2,
+        critical: 0.9, jackpot: 2.3, stage_clear: 1.2, comeback: 1.3, llama_drop: 1.6
+      }.freeze
       TOTAL_FIELDS = %i[tokens reductions errors repairs inserted discarded].freeze
 
       attr_reader :folded_events
@@ -31,8 +37,26 @@ module Doparserb
         engine.session do
           Scenes::KINDS.each do |kind|
             break if engine.cancelled?
-            scene = Scenes.build(kind, Scenes::DEMO_STATS)
-            engine.scene(kind, title: scene.title, subtitle: scene.subtitle, data: scene.data, duration: DEMO_DURATION * config.duration)
+            stats = Scenes::DEMO_STATS
+            stats = case kind
+                    when :shift
+                      stats.merge(blocks: stats[:blocks].reverse.freeze, symbol_label: "NUMBER", next_token: nil, chain: 0,
+                                  event: {code: "S", sym: 2, state: 3, depth: 2}.freeze)
+                    when :reduce
+                      stats.merge(blocks: stats[:blocks].last(1).freeze, depth: 1, chain: 1,
+                                  event: {code: "R", len: 2, rule: 1, state: 5, depth: 2}.freeze)
+                    when :recovery
+                      stats.merge(blocks: [{sym: 1, state: 5, label: "error"}.freeze].freeze, depth: 1, chain: 0,
+                                  event: {code: "X", state: 5, depth: 1}.freeze)
+                    else stats
+                    end
+            if (multiplier = {critical: 4, jackpot: 16}[kind])
+              points = 20 * multiplier
+              stats = stats.merge(multiplier: multiplier, game: {points: points, score: 1000 + points, combo: 8})
+            end
+            scene = Scenes.build(kind, stats)
+            duration = SCENE_DURATIONS.fetch(kind, DEMO_DURATION) * config.duration
+            engine.scene(kind, title: scene.title, subtitle: scene.subtitle, data: scene.data, duration: duration)
           end
           engine.badge("* DOPARSERB DEMO * ALL PARSE SCENES")
         end
@@ -90,7 +114,7 @@ module Doparserb
           count.times do
             break if @queue.empty? || now + 1e-9 < @next_at
             scene = @queue.shift
-            interval = @interval || (@config.replay == :full ? 1.0 / @config.speed : 0.025)
+            interval = interval_for(scene)
             @animation_started = nil
             safely do
               names = @names[scene.data[:event].values_at(:parser, :pid, :parse_id)]
@@ -100,6 +124,7 @@ module Doparserb
               if tween
                 @animation_started = now
                 duration = ANIMATION_DURATION * @config.duration
+                duration = [duration, interval].max if @config.replay == :highlight
                 @animation_duration = @queue.empty? && !@finished ? duration : [duration, interval].min
               end
             end
@@ -149,6 +174,20 @@ module Doparserb
 
       private
 
+      def interval_for(scene)
+        return @highlight_intervals.shift if @highlight_intervals
+        return 1.0 / @config.speed if @config.replay == :full
+
+        duration = if scene.strength == :huge
+                     (SCENE_DURATIONS.fetch(scene.kind, DEMO_DURATION) / 2).clamp(0.55, 0.9)
+                   elsif Scenes.priority(scene.kind) >= 3
+                     0.55
+                   else
+                     0.14
+                   end
+        duration * @config.duration
+      end
+
       def animate_current(now)
         return unless @animation_started
         progress = ((now - @animation_started) / @animation_duration).clamp(0.0, 1.0)
@@ -197,7 +236,13 @@ module Doparserb
         @folded_events += [original - @queue.length, 0].max
         speed = [stride, 1].max
         @queue.map! { |scene| Scenes::Scene.new(**scene.to_h.merge(subtitle: ">> x#{speed}  #{scene.subtitle}")) }
-        @interval = (1.5 * @config.duration).clamp(1.0, 2.0) / [@queue.length, 1].max
+        weights = @queue.map { |scene| SCENE_DURATIONS.fetch(scene.kind, DEMO_DURATION) }
+        if @queue.last && Scenes.priority(@queue.last.kind) >= 3
+          weights[-1] = [weights.last, weights[0...-1].sum].max
+        end
+        budget = (1.5 * @config.duration).clamp(1.0, 2.0)
+        total_weight = weights.sum
+        @highlight_intervals = weights.map { |weight| budget * weight / total_weight }
       end
 
       def complete

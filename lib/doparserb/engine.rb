@@ -32,6 +32,9 @@ module Doparserb
     GOLD = [255, 212, 92].freeze
     MINT = [112, 242, 176].freeze
     VIOLET = [155, 123, 255].freeze
+    PLAY_IMPACT = {shift: 0.58, reduce: 0.52, chain: 0.52, from_nothing: 0.52,
+                   recovery: 0.62, repair_plan: 0.62, inserted: 0.62, auto_repair: 0.62}.freeze
+    REEL_STOPS = [0.20, 0.38, 0.58].freeze
 
     # Braille is Unicode-neutral; ambiguous block widths retain the upstream fallback.
     original_width = Dopairb::Term.method(:char_width)
@@ -220,7 +223,16 @@ module Doparserb
     def paint_frame(kind:, title:, subtitle: "", progress: 1.0, data: {}, audio: false)
       return unless animated? && !cancelled? && !@paused
       if audio && !@scene_sound && (data[:play] || %i[title charging].include?(kind) && @live_sound_kind != kind)
-        sound(kind, data)
+        @impact_sound = nil
+        if data[:play] && PLAY_IMPACT.key?(kind)
+          @impact_sound = [kind, data]
+        else
+          sound(kind, data)
+        end
+      end
+      if @impact_sound && progress >= PLAY_IMPACT.fetch(@impact_sound.first)
+        sound(*@impact_sound)
+        @impact_sound = nil
       end
       @live_sound_kind = kind
       if data[:play]
@@ -234,7 +246,8 @@ module Doparserb
       lines = render(kind, title: title, subtitle: subtitle, progress: progress, data: data, width: width, height: height)
       Dopairb::Term::LOCK.synchronize do
         return if @paused
-        flash = config.flash == :full && config.color != :none && progress.between?(0.45, 0.53)
+        impact = data[:play] ? play_impact(kind) : 0.45
+        flash = config.flash == :full && config.color != :none && progress.between?(impact, impact + 0.08)
         if flash != !!@inverted
           @writer.write(flash ? "\e[?5h" : "\e[?5l")
           @inverted = flash
@@ -252,11 +265,17 @@ module Doparserb
       return unless animated? && !cancelled?
       resume
       @scene_sound = true
-      sound(kind, data)
+      @impact_sound = nil
+      impact = data[:play] ? PLAY_IMPACT.fetch(kind, 0) : 0
+      sounded = false
       started = now
       deadline = started + duration
       loop do
         progress = duration.positive? ? ((now - started) / duration).clamp(0, 1) : 1.0
+        if !sounded && progress >= impact
+          sound(kind, data)
+          sounded = true
+        end
         frame(kind, title: title, subtitle: subtitle, progress: progress, data: data)
         break if now >= deadline || !wait([deadline - now, 0.025].min)
       end
@@ -294,7 +313,10 @@ module Doparserb
       Dopairb::Term::LOCK.synchronize { @paused = false }
     end
 
-    def silence = stop_sound
+    def silence
+      @impact_sound = nil
+      stop_sound
+    end
 
     def badge(text, new_line: false)
       return unless enabled? && config.trail == :badge
@@ -356,7 +378,8 @@ module Doparserb
 
     def render_tower(kind, title, subtitle, progress, data, width, height)
       canvas = Dopairb::Canvas.new(width, height)
-      backdrop(canvas, kind, progress)
+      impact = play_impact(kind)
+      backdrop(canvas, kind, progress, impact: impact)
       fever = data.dig(:game, :fever)
       color = fever ? Dopairb::Color.rainbow(data[:game][:combo].fdiv(12) % 1) : palette(kind, progress)
       preview_width = [width / 3, 24].min
@@ -370,42 +393,18 @@ module Doparserb
       canvas.put(left, floor, "=" * block_width, VIOLET)
       panel_left = width >= 64 ? width / 2 : preview_left
       panel_width = width - panel_left
-      label = case kind
-              when :chain then "#{data[:chain]} CHAIN"
-              when :stage_clear then "CLEAR"
-              when :comeback then "BACK!"
-              when :auto_repair, :repair_plan, :inserted, :recovery then "REPAIR"
-              when :syntax_break, :collapse, :exhausted, :aborted then "BREAK"
-              when :tower_milestone then "#{data[:max_depth]}F"
-              when :token_milestone then "#{data[:tokens].to_i / 1000}K"
-              else kind.to_s.upcase.tr("_", " ")
-              end
-      burst(canvas, left + block_width / 2, [floor - blocks.size, 4].max, progress, color: color)
-      if %i[reduce chain].include?(kind)
-        spread = (6 * (1 - progress)).round
-        canvas.put(left + block_width / 2 - spread - 3, 3, ">>>", CYAN)
-        canvas.put(left + block_width / 2 + spread, 3, "<<<", PINK)
-      elsif %i[recovery auto_repair inserted repair_plan].include?(kind)
-        4.times { |index| canvas.put(panel_left + (index * 7) % panel_width, 3 + ((index + progress * 5) % [height - 6, 1].max), "+", MINT, bold: true) }
-      elsif %i[stage_clear comeback jackpot].include?(kind)
-        3.times { |index| burst(canvas, width * (index + 1) / 4, 4 + index % 2, (progress + index * 0.2) % 1, color: [GOLD, PINK, CYAN][index]) }
+      hit = Dopairb::Fx.phase(progress, impact, 1)
+      if progress >= impact && !%i[next tower].include?(kind)
+        burst(canvas, left + block_width / 2, [floor - blocks.size, 4].max, hit, color: color)
       end
       if width >= 64 && height >= 12
-        headline(canvas, label, progress, y: 4, left: panel_left, width: panel_width, half: true, color: color)
-        sprite = case kind
-                 when :stage_clear, :comeback, :token_milestone then :trophy
-                 when :repair_plan, :inserted, :auto_repair, :recovery then :shield
-                 when :syntax_break, :collapse, :exhausted, :aborted then :boss
-                 when :jackpot then :slots
-                 else :llama
-                 end
-        draw_sprite(canvas, sprite, panel_left + panel_width / 2, 9, progress, limit: height - 11)
+        play_panel(canvas, kind, progress, data, panel_left, panel_width, color)
       else
-        canvas.put(panel_left, 4, crop(label, panel_width), color, bold: true)
+        canvas.put(panel_left, 4, crop(kind.to_s.upcase.tr("_", " "), panel_width), color, bold: true)
       end
       blocks.reverse_each.with_index do |block, index|
         row = floor - blocks.size + index
-        row -= ((1 - Dopairb::Fx.ease_in([progress * 2, 1].min)) * 3).round if index.zero? && kind == :shift
+        row -= ((1 - Dopairb::Fx.ease_in([progress / impact, 1].min)) * 3).round if index.zero? && kind == :shift
         row = [row, 3].max
         label = crop(block[:label] || (block[:sym] ? "SYM #{block[:sym]}" : "RULE #{block[:rule]}"), block_width - 4)
         block_color = Dopairb::Color.rainbow((block[:sym] || block[:rule]).to_i.fdiv(11) % 1, 0.65)
@@ -420,22 +419,206 @@ module Doparserb
       canvas.put(preview_left, 0, "NEXT", CYAN, bold: true)
       canvas.put(preview_left, 1, crop(data.dig(:next_token, :label) || "-", preview_width), MINT, bold: true)
       canvas.put(0, 1, crop("DEPTH #{data[:depth]}F", preview_left - 1), color)
-      canvas.put(0, 2, crop(hud, width), PINK, bold: true)
+      canvas.put(0, 2, crop(hud, width >= 64 ? preview_left - 1 : width), PINK, bold: true)
+      if width >= 64
+        chain = data[:chain].to_i
+        target = Game::CHAIN_BONUSES.keys.find { |step| step > chain }
+        fill = target ? (chain.fdiv(target) * 6).floor : 6
+        meter = "#{target ? "CHAIN ->#{target}" : 'CHAIN MAX'} [#{'=' * fill}#{'.' * (6 - fill)}]"
+        canvas.put(preview_left, 2, meter, target ? VIOLET : GOLD, bold: true)
+      end
       2.times { |row| canvas.put(0, height - 2 + row, " " * width, nil, bg: INK) }
+      if kind == :jackpot && progress < REEL_STOPS.last
+        title = progress < REEL_STOPS[1] ? "BONUS CHANCE" : "LAST REEL..."
+        subtitle = "HOLD...  HOLD..."
+      elsif kind == :critical && progress < 0.22
+        title, subtitle = "CHARGE...", ""
+      elsif PLAY_IMPACT.key?(kind) && progress < impact
+        subtitle = case kind
+                   when :shift then "TOKEN IN FLIGHT"
+                   when :reduce, :chain, :from_nothing then "RULE #{data.dig(:event, :rule)}   #{data.dig(:event, :len)} BLOCKS -> ?"
+                   else "RECONNECTING PARSER STACK"
+                   end
+      end
       canvas.put_center(height - 2, crop(title, width), color, bold: true)
       canvas.put_center(height - 1, crop(subtitle, width), CYAN)
       finish_canvas(canvas)
     end
 
-    def backdrop(canvas, kind, progress)
+    def play_impact(kind)
+      return REEL_STOPS.last if kind == :jackpot
+      return 0.22 if kind == :critical
+      PLAY_IMPACT.fetch(kind, 0.35)
+    end
+
+    def play_panel(canvas, kind, progress, data, left, width, color)
+      center = left + width / 2
+      floor = canvas.h - 3
+      target = [floor - 4, 4].max
+      impact = play_impact(kind)
+      hit = Dopairb::Fx.phase(progress, impact, 1)
+      case kind
+      when :next
+        token_capsule(canvas, center, target, data.dig(:next_token, :label) || "TOKEN", CYAN)
+        panel_caption(canvas, left, width, "NEXT / LOOKAHEAD", CYAN)
+      when :shift
+        falling = Dopairb::Fx.ease_in(Dopairb::Fx.phase(progress, 0.18, impact))
+        y = (4 + (target - 4) * falling).round
+        label = data[:symbol_label] || data.dig(:next_token, :label) || data[:blocks].last&.dig(:label) || "TOKEN"
+        caption = progress < 0.18 ? "SHIFT / READY" : progress < impact ? "SHIFT / DROP" : "SHIFT / LANDED"
+        if progress < impact
+          (4...y).each do |row|
+            canvas.put(center - 10, row, ":", Dopairb::Color.scale(CYAN, 0.5))
+            canvas.put(center + 10, row, "|", CYAN)
+          end
+        else
+          burst(canvas, center, floor - 1, hit, color: CYAN)
+        end
+        canvas.put(center - 12, floor, "__\\___________/__________", VIOLET)
+        token_capsule(canvas, center, y, label, CYAN, squash: progress.between?(impact, impact + 0.12))
+        panel_caption(canvas, left, width, caption, CYAN)
+      when :reduce, :chain, :from_nothing
+        count = data.dig(:event, :len).to_i
+        if progress < impact
+          spread = (width / 2 - 8) * (1 - Dopairb::Fx.ease_in(progress / impact))
+          shown = count.clamp(1, 3)
+          shown.times do |index|
+            offset = shown == 1 ? 0 : (index.fdiv(shown - 1) * 2 - 1) * spread
+            token_capsule(canvas, center + offset.round, target, count.zero? ? "EMPTY" : "RHS #{index + 1}",
+                          [CYAN, PINK, VIOLET][index], size: 10)
+          end
+          canvas.put(center - 8, 5, ">>>   FUSE   <<<", GOLD, bold: true)
+        else
+          burst(canvas, center, target + 1, hit, color: GOLD)
+          label = data[:blocks].last&.dig(:label) || "RULE #{data.dig(:event, :rule)}"
+          token_capsule(canvas, center, target, label, GOLD)
+          if kind == :chain
+            headline(canvas, "#{data[:chain]} CHAIN", hit, y: 4, left: left, width: width, half: true, color: GOLD)
+          else
+            gain = data.dig(:game, :points) || 10 * count
+            canvas.put(center - 8, 6, "#{count} -> 1   +#{(gain * Dopairb::Fx.ease_out(hit)).round}", GOLD, bold: true)
+          end
+        end
+        panel_caption(canvas, left, width, progress < impact ? "REDUCE / COLLIDE" : "REDUCE / FUSED", GOLD)
+      when :recovery, :repair_plan, :inserted, :auto_repair
+        closed = Dopairb::Fx.ease_out(Dopairb::Fx.phase(progress, 0.18, impact))
+        y = (4 + (target - 4) * closed).round
+        span = ((1 - closed) * 5).round
+        canvas.put(center - 15, floor - 1, progress < impact ? "========//          \\\\========" : "==============================", MINT)
+        (4...y).each { |row| canvas.put(center, row, "||", CYAN) }
+        canvas.put(center - 10 - span, y + 1, ">>", MINT, bold: true)
+        canvas.put(center + 9 + span, y + 1, "<<", MINT, bold: true)
+        label = case kind
+                when :recovery then "error"
+                when :repair_plan then "+#{data.dig(:event, :n)} TOKENS"
+                when :inserted then data[:symbol_label] || "TOKEN"
+                else "PATCH"
+                end
+        burst(canvas, center, floor - 1, hit, color: MINT) if progress >= impact
+        token_capsule(canvas, center, y, label, MINT)
+        if progress >= impact
+          canvas.put(center - 14 + (hit * 28).round, floor, "*", [255, 255, 255], bold: true)
+        end
+        panel_caption(canvas, left, width, progress < impact ? "RECOVERY / CATCH" : "RECOVERY / REJOIN", MINT)
+      when :jackpot
+        jackpot_panel(canvas, progress, data, left, width)
+      when :critical
+        if progress < 0.22
+          head = left + width * progress / 0.22
+          7.times { |row| canvas.put(head - row * 2, 4 + row, "\\\\", [255, 255, 255], bold: true) }
+        else
+          phase = Dopairb::Fx.phase(progress, 0.22, 1)
+          burst(canvas, center, 7, phase, color: PINK)
+          headline(canvas, "X#{data[:multiplier] || 4}", phase, y: 5, left: left, width: width, color: PINK)
+          canvas.put(center - 7, floor - 1, "+#{((data.dig(:game, :points) || 0) * Dopairb::Fx.ease_out(phase)).round}  CRITICAL", GOLD, bold: true)
+        end
+        panel_caption(canvas, left, width, progress < 0.22 ? "CHARGE..." : "CRITICAL!!", PINK)
+      else
+        celebration = %i[stage_clear comeback token_milestone].include?(kind)
+        if celebration && progress >= 0.28
+          3.times { |index| burst(canvas, canvas.w * (index + 1) / 4, 5 + index % 2, (hit + index * 0.2) % 1, color: [GOLD, PINK, CYAN][index]) }
+        end
+        label = case kind
+                when :stage_clear then "CLEAR"
+                when :comeback then "BACK!"
+                when :syntax_break, :collapse, :exhausted, :aborted then "BREAK"
+                when :tower_milestone then "#{data[:max_depth]}F"
+                when :token_milestone then "#{data[:tokens].to_i / 1000}K"
+                else kind.to_s.upcase.tr("_", " ")
+                end
+        headline(canvas, label, progress, y: 4, left: left, width: width, half: true, color: color)
+        draw_sprite(canvas, celebration ? :trophy : :boss, center, 9, progress, limit: canvas.h - 11)
+      end
+    end
+
+    def panel_caption(canvas, left, width, text, color)
+      canvas.put(left, 3, " " * width, nil, bg: INK)
+      canvas.put(left + (width - text.length) / 2, 3, text, color, bold: true)
+    end
+
+    def token_capsule(canvas, center, y, label, color, size: 16, squash: false)
+      label = crop(label, size - 2).center(size - 2)
+      rows = if squash
+               [".#{'=' * size}.", "| #{label} |", "'#{'=' * size}'"]
+             else
+               [" .#{'-' * size}.", "/#{'_' * size}/|", "| #{label} ||", "|#{'_' * size}|/"]
+             end
+      left = center - (size + 3) / 2
+      rows.each_with_index do |line, row|
+        canvas.put(left, y + row, line, row == 2 || squash ? [255, 255, 255] : color,
+                   bg: Dopairb::Color.scale(color, row == 2 ? 0.25 : 0.10), bold: true)
+      end
+    end
+
+    def jackpot_panel(canvas, progress, data, left, width)
+      won = progress >= REEL_STOPS.last
+      phase = Dopairb::Fx.phase(progress, REEL_STOPS.last, 1)
+      if won
+        24.times do |index|
+          x = (index * 17 + 3) % canvas.w
+          y = 4 + ((index * 3 + phase * 12) % [canvas.h - 7, 1].max)
+          canvas.put(x, y, index.even? ? "$" : "o", [GOLD, PINK, CYAN][index % 3], bold: true)
+        end
+        burst(canvas, left + width / 2, 7, phase, color: GOLD)
+      end
+      if canvas.h >= 16 && progress < 0.78
+        origin = left + (width - 31) / 2
+        33.times do |index|
+          color = (index + (progress * 24).to_i).even? ? GOLD : VIOLET
+          canvas.put(origin - 1 + index, 4, "o", color, bold: true)
+          canvas.put(origin - 1 + index, 10, "o", color, bold: true)
+        end
+        REEL_STOPS.each_with_index do |stop, index|
+          stopped = progress >= stop
+          symbol = stopped ? "7" : %w[3 8 2 5 9][((progress * 32).floor + index * 2) % 5]
+          x = origin + index * 11
+          5.times { |row| canvas.put(x, 5 + row, " " * 9, nil, bg: [235, 230, 220]) }
+          ink = stopped ? [210, 30, 80] : [105, 95, 120]
+          Dopairb::Fx.big_text(canvas, symbol, x + 2, 5, ->(*) { ink }, bg_fn: ->(*) { ink })
+        end
+      elsif won && canvas.h >= 16
+        headline(canvas, "777", phase, y: 5, left: left, width: width, color: GOLD)
+      else
+        reels = REEL_STOPS.map.with_index { |stop, index| "[#{progress >= stop ? 7 : (progress * 30 + index).to_i % 10}]" }.join(" ")
+        canvas.put(left + (width - reels.length) / 2, 5, reels, GOLD, bold: true)
+      end
+      caption = won ? "JACKPOT!! x#{data[:multiplier] || 16}" : progress >= REEL_STOPS[1] ? "LAST REEL..." : "BONUS CHANCE"
+      panel_caption(canvas, left, width, caption, won ? GOLD : VIOLET)
+      if won
+        gain = ((data.dig(:game, :points) || 0) * Dopairb::Fx.ease_out(phase)).round
+        canvas.put(left + width / 2 - 3, canvas.h - 4, "+#{gain}", GOLD, bold: true)
+      end
+    end
+
+    def backdrop(canvas, kind, progress, impact: 0.45)
       color = palette(kind, progress)
       canvas.h.times do |row|
         canvas.fill_bg(Dopairb::Color.mix(INK, color, 0.04 + row.fdiv([canvas.h, 1].max) * 0.07), 0, row, canvas.w, 1)
       end
-      count = config.intensity == :low ? 5 : 18
+      count = config.intensity == :low || PLAY_IMPACT.key?(kind) || kind == :next ? 4 : 18
       Dopairb::Fx.sparkles(canvas, progress, kind.to_s.bytes.sum, count,
                            palette: [CYAN, PINK, GOLD, VIOLET], area: [0, 2, canvas.w, [canvas.h - 4, 1].max])
-      if config.flash != :off && progress.between?(0.45, 0.53) && config.color != :none
+      if config.flash != :off && progress.between?(impact, impact + 0.08) && config.color != :none
         canvas.tint_bg(color, 0.2)
       end
     end

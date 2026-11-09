@@ -344,6 +344,11 @@ class PlayShowTest < Test::Unit::TestCase
         show.tick
         @time += 0.1
       end
+      deadline = @time + 2
+      until show.pending_count.zero? || @time >= deadline
+        show.tick
+        @time += 0.05
+      end
       assert_equal(0, show.pending_count)
       show.finish
       drain(show)
