@@ -1,0 +1,5 @@
+%left '+'
+%right '+'
+%%
+start: 'a';
+%%

@@ -1,0 +1,309 @@
+#if defined(DOPA_RT_DISABLE) || defined(_WIN32)
+# define DOPA_DECL()
+# define DOPA_BEGIN() ((void) 0)
+# define DOPA_FLUSH() ((void) 0)
+# define DOPA_TOKEN(sym, loc) ((void) 0)
+# define DOPA_SHIFT(sym, state, depth) ((void) 0)
+# define DOPA_REDUCE(rule, len, state, depth) ((void) 0)
+# define DOPA_ERROR(state, sym, loc) ((void) 0)
+# define DOPA_POP(n, depth) ((void) 0)
+# define DOPA_ERROR_SHIFT(state, depth) ((void) 0)
+# define DOPA_REPAIR_PLAN(n) ((void) 0)
+# define DOPA_REPAIR_TOKEN(sym) ((void) 0)
+# define DOPA_REPAIR_DONE() ((void) 0)
+# define DOPA_ACCEPT() ((void) 0)
+# define DOPA_ABORT() ((void) 0)
+# define DOPA_EXHAUSTED() ((void) 0)
+# define DOPA_END() ((void) 0)
+#else
+# include <errno.h>
+# include <fcntl.h>
+# include <limits.h>
+# include <stdio.h>
+# include <stdlib.h>
+# include <string.h>
+# include <sys/ioctl.h>
+# include <sys/socket.h>
+# include <unistd.h>
+
+# if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_ATOMICS__)
+#  include <stdatomic.h>
+#  define yydopa_atomic(type) _Atomic(type)
+#  define yydopa_load(p) atomic_load_explicit((p), memory_order_relaxed)
+#  define yydopa_exchange(p, n) atomic_exchange_explicit((p), (n), memory_order_relaxed)
+#  define yydopa_add(p, n) atomic_fetch_add_explicit((p), (n), memory_order_relaxed)
+# else
+#  define yydopa_atomic(type) type
+#  define yydopa_load(p) __atomic_load_n((p), __ATOMIC_RELAXED)
+#  define yydopa_exchange(p, n) __atomic_exchange_n((p), (n), __ATOMIC_RELAXED)
+#  define yydopa_add(p, n) __atomic_fetch_add((p), (n), __ATOMIC_RELAXED)
+# endif
+
+static const char yydopa_metadata[] = <%= metadata_literal %>;
+static yydopa_atomic(unsigned long) yydopa_sequence;
+static yydopa_atomic(unsigned long) yydopa_dropped;
+static yydopa_atomic(unsigned int) yydopa_failures;
+static yydopa_atomic(int) yydopa_disabled;
+static yydopa_atomic(long) yydopa_metadata_pid;
+
+struct yydopa_context
+{
+  int on, fd, eager, color, outcome;
+  long pid, line, column, tower;
+  unsigned long parse_id, tokens, chain, max_chain, errors, repairs;
+  size_t used, prefix;
+  unsigned long events;
+  char buffer[2048];
+};
+
+static char *
+yydopa_unsigned(char *p, unsigned long value)
+{
+  char digits[3 * sizeof value];
+  size_t n = 0;
+  do { digits[n++] = (char) ('0' + value % 10); value /= 10; } while (value);
+  while (n) *p++ = digits[--n];
+  return p;
+}
+
+static char *
+yydopa_number(char *p, long value)
+{
+  if (value < 0)
+    {
+      *p++ = '-';
+      return yydopa_unsigned(p, (unsigned long) (-(value + 1)) + 1);
+    }
+  return yydopa_unsigned(p, (unsigned long) value);
+}
+
+static void
+yydopa_chunk(struct yydopa_context *d)
+{
+  char *p = d->buffer;
+  memcpy(p, "F <%= parser_id %> ", 11);
+  p = yydopa_number(p + 11, d->pid);
+  *p++ = ' ';
+  p = yydopa_unsigned(p, d->parse_id);
+  *p++ = '\n';
+  d->prefix = d->used = (size_t) (p - d->buffer);
+  d->events = 0;
+}
+
+static void
+yydopa_flush(struct yydopa_context *d)
+{
+  int saved_errno = errno;
+  unsigned long lost;
+  int flags = 0;
+  if (!d->events || d->fd < 0) return;
+  if (yydopa_load(&yydopa_disabled)) { yydopa_chunk(d); return; }
+  lost = yydopa_exchange(&yydopa_dropped, 0);
+  if (lost)
+    {
+      char notice[3 * sizeof lost + 4];
+      char *p = notice;
+      size_t n;
+      *p++ = 'D'; *p++ = ' ';
+      p = yydopa_unsigned(p, lost);
+      *p++ = '\n';
+      n = (size_t) (p - notice);
+      memmove(d->buffer + d->prefix + n, d->buffer + d->prefix, d->used - d->prefix);
+      memcpy(d->buffer + d->prefix, notice, n);
+      d->used += n;
+    }
+# ifdef MSG_NOSIGNAL
+  flags |= MSG_NOSIGNAL;
+# endif
+# ifdef MSG_DONTWAIT
+  flags |= MSG_DONTWAIT;
+# endif
+  if (send(d->fd, d->buffer, d->used, flags) == (ssize_t) d->used)
+    yydopa_exchange(&yydopa_failures, 0);
+  else
+    {
+      yydopa_add(&yydopa_dropped, lost + d->events);
+      if (yydopa_add(&yydopa_failures, 1) >= 63)
+        yydopa_exchange(&yydopa_disabled, 1);
+    }
+  yydopa_chunk(d);
+  errno = saved_errno;
+}
+
+static void
+yydopa_event(struct yydopa_context *d, char code, int count, long a, long b, long c, long e)
+{
+  long values[4];
+  char line[4 * (3 * sizeof(long) + 2) + 3];
+  char *p = line;
+  size_t size;
+  int i;
+  switch (code)
+    {
+    case 'S': d->tokens++; d->chain = 0; if (c > d->tower) d->tower = c; break;
+    case 'R':
+      d->chain++;
+      if (d->chain > d->max_chain) d->max_chain = d->chain;
+      if (e - b + 1 > d->tower) d->tower = e - b + 1;
+      break;
+    case 'E': d->errors++; d->chain = 0; d->line = c; d->column = e; break;
+    case 'X': if (b > d->tower) d->tower = b; break;
+    case 'C': d->repairs++; break;
+    case 'A': case 'Z': case 'O': d->outcome = code; break;
+    default: break;
+    }
+  if (d->fd < 0 || yydopa_load(&yydopa_disabled)) return;
+  values[0] = a; values[1] = b; values[2] = c; values[3] = e;
+  *p++ = code;
+  for (i = 0; i < count; ++i) { *p++ = ' '; p = yydopa_number(p, values[i]); }
+  *p++ = '\n';
+  size = (size_t) (p - line);
+  /* Reserve space for a dropped-event notice added when this chunk is sent. */
+  if (d->used + size > sizeof d->buffer - 64) yydopa_flush(d);
+  memcpy(d->buffer + d->used, line, size);
+  d->used += size;
+  d->events++;
+}
+
+static int
+yydopa_socket(const char *text)
+{
+  unsigned int value = 0;
+  int type;
+  socklen_t length = sizeof type;
+  struct sockaddr_storage address;
+  if (!text || !*text) return -1;
+  do
+    {
+      unsigned int digit = (unsigned int) (*text++ - '0');
+      if (digit > 9 || value > ((unsigned int) INT_MAX - digit) / 10) return -1;
+      value = value * 10 + digit;
+    }
+  while (*text);
+  if (getsockopt((int) value, SOL_SOCKET, SO_TYPE, &type, &length) != 0 || type != SOCK_DGRAM) return -1;
+  length = sizeof address;
+  if (getsockname((int) value, (struct sockaddr *) &address, &length) != 0 || address.ss_family != AF_UNIX) return -1;
+# if defined(SO_NOSIGPIPE) && !defined(MSG_NOSIGNAL)
+  type = 1;
+  if (setsockopt((int) value, SOL_SOCKET, SO_NOSIGPIPE, &type, sizeof type) != 0) return -1;
+# endif
+# ifndef MSG_DONTWAIT
+  /* Strict POSIX headers can hide MSG_DONTWAIT; the dedicated event fd must not block. */
+  type = fcntl((int) value, F_GETFL);
+  if (type < 0 || fcntl((int) value, F_SETFL, type | O_NONBLOCK) < 0) return -1;
+# endif
+  return (int) value;
+}
+
+static void
+yydopa_meta(struct yydopa_context *d)
+{
+  size_t offset = 0, total = sizeof yydopa_metadata - 1;
+  if (yydopa_exchange(&yydopa_metadata_pid, d->pid) == d->pid) return;
+  do
+    {
+      char *p = d->buffer + d->used;
+      size_t n;
+      memcpy(p, "M <%= parser_id %> ", 11);
+      p = yydopa_unsigned(p + 11, (unsigned long) offset);
+      *p++ = ' ';
+      p = yydopa_unsigned(p, (unsigned long) total);
+      *p++ = '\n';
+      d->used = (size_t) (p - d->buffer);
+      n = sizeof d->buffer - 64 - d->used;
+      if (n > total - offset) n = total - offset;
+      memcpy(p, yydopa_metadata + offset, n);
+      d->used += n;
+      d->events = 1;
+      yydopa_flush(d);
+      offset += n;
+    }
+  while (offset < total && !yydopa_load(&yydopa_disabled));
+}
+
+static void
+yydopa_begin(struct yydopa_context *d)
+{
+  int saved_errno = errno;
+  int fd;
+  const char *setting = getenv("DOPAPARSER");
+  const char *term;
+  d->on = 0;
+  if (setting && strcmp(setting, "off") == 0) goto done;
+  fd = yydopa_socket(getenv("DOPAPARSER_FD"));
+  term = getenv("TERM");
+  if (fd < 0 && (!isatty(STDERR_FILENO) || (term && strcmp(term, "dumb") == 0))) goto done;
+  memset(d, 0, sizeof *d);
+  d->on = 1;
+  d->fd = fd;
+  d->color = getenv("NO_COLOR") == NULL;
+  setting = getenv("DOPAPARSER_FLUSH");
+  d->eager = setting && strcmp(setting, "eager") == 0;
+  if (fd >= 0)
+    {
+      if (yydopa_load(&yydopa_disabled)) { d->on = 0; goto done; }
+      d->pid = (long) getpid();
+      d->parse_id = yydopa_add(&yydopa_sequence, 1) + 1;
+      yydopa_chunk(d);
+      yydopa_meta(d);
+      yydopa_event(d, 'B', 0, 0, 0, 0, 0);
+    }
+done:
+  errno = saved_errno;
+}
+
+static void
+yydopa_end(struct yydopa_context *d)
+{
+  int saved_errno = errno;
+  if (d->fd >= 0) yydopa_flush(d);
+  else
+    {
+      char badge[512];
+      char message[384];
+      char recovery[96] = "";
+      struct winsize terminal;
+      const char *result = d->outcome == 'A' ? (d->errors ? "COMEBACK! STAGE CLEAR!" : "STAGE CLEAR!") : d->outcome == 'O' ? "STACK EXHAUSTED" : "ABORTED";
+      int length;
+      if (d->errors)
+        snprintf(recovery, sizeof recovery, " | SYNTAX BREAK @%ld:%ld%s", d->line, d->column,
+                 d->outcome == 'A' ? " | RECOVERED" : "");
+      length = snprintf(message, sizeof message, "%s %lu TOKENS | MAX CHAIN %lu | TOWER %ldF%s%s",
+                        result, d->tokens, d->max_chain, d->tower,
+                        recovery, d->repairs ? " | AUTO REPAIR!" : "");
+      if (length < 0) length = 0;
+      if ((size_t) length >= sizeof message) length = sizeof message - 1;
+      if (ioctl(STDERR_FILENO, TIOCGWINSZ, &terminal) == 0 && terminal.ws_col && length >= terminal.ws_col)
+        length = terminal.ws_col - 1;
+      length = snprintf(badge, sizeof badge, "%s%.*s%s\n", d->color ? "\033[1;36m" : "",
+                        length, message, d->color ? "\033[0m" : "");
+      if (isatty(STDOUT_FILENO)) fflush(stdout);
+      if (length > 0) (void) write(STDERR_FILENO, badge, (size_t) length < sizeof badge ? (size_t) length : sizeof badge - 1);
+    }
+  errno = saved_errno;
+}
+
+# if defined(YYLTYPE_IS_TRIVIAL) && YYLTYPE_IS_TRIVIAL
+#  define yydopa_line(loc) ((loc)->first_line)
+#  define yydopa_column(loc) ((loc)->first_column)
+# else
+#  define yydopa_line(loc) 0
+#  define yydopa_column(loc) 0
+# endif
+# define DOPA_DECL() struct yydopa_context yydopa
+# define DOPA_BEGIN() yydopa_begin(&yydopa)
+# define DOPA_FLUSH() do { if (yydopa.on) { if (yydopa.eager) yydopa_flush(&yydopa); } } while (0)
+# define DOPA_TOKEN(sym, loc) do { if (yydopa.on) yydopa_event(&yydopa, 'T', 3, (long) (sym), yydopa_line(loc), yydopa_column(loc), 0); } while (0)
+# define DOPA_SHIFT(sym, state, depth) do { if (yydopa.on) yydopa_event(&yydopa, 'S', 3, (long) (sym), (long) (state), (long) (depth), 0); } while (0)
+# define DOPA_REDUCE(rule, len, state, depth) do { if (yydopa.on) yydopa_event(&yydopa, 'R', 4, (long) (rule), (long) (len), (long) (state), (long) (depth)); } while (0)
+# define DOPA_ERROR(state, sym, loc) do { if (yydopa.on) yydopa_event(&yydopa, 'E', 4, (long) (state), (long) (sym), yydopa_line(loc), yydopa_column(loc)); } while (0)
+# define DOPA_POP(n, depth) do { if (yydopa.on) yydopa_event(&yydopa, 'P', 2, (long) (n), (long) (depth), 0, 0); } while (0)
+# define DOPA_ERROR_SHIFT(state, depth) do { if (yydopa.on) yydopa_event(&yydopa, 'X', 2, (long) (state), (long) (depth), 0, 0); } while (0)
+# define DOPA_REPAIR_PLAN(n) do { if (yydopa.on) yydopa_event(&yydopa, 'Q', 1, (long) (n), 0, 0, 0); } while (0)
+# define DOPA_REPAIR_TOKEN(sym) do { if (yydopa.on) yydopa_event(&yydopa, 'I', 1, (long) (sym), 0, 0, 0); } while (0)
+# define DOPA_REPAIR_DONE() do { if (yydopa.on) yydopa_event(&yydopa, 'C', 0, 0, 0, 0, 0); } while (0)
+# define DOPA_ACCEPT() do { if (yydopa.on) yydopa_event(&yydopa, 'A', 0, 0, 0, 0, 0); } while (0)
+# define DOPA_ABORT() do { if (yydopa.on) yydopa_event(&yydopa, 'Z', 0, 0, 0, 0, 0); } while (0)
+# define DOPA_EXHAUSTED() do { if (yydopa.on) yydopa_event(&yydopa, 'O', 0, 0, 0, 0, 0); } while (0)
+# define DOPA_END() do { if (yydopa.on) yydopa_end(&yydopa); } while (0)
+#endif

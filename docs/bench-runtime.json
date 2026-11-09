@@ -1,0 +1,906 @@
+{
+  "measured_at": "2026-11-09T14:08:00Z",
+  "ruby": "ruby 4.0.9 (2026-10-23 revision 3e93b23afc) +PRISM [arm64-darwin25]",
+  "host": "arm64-apple-darwin25",
+  "lrama": "lrama-263a3a4b99b0",
+  "dopairb": "dopairb-da3303ccb7e1",
+  "runs": 10,
+  "warmups_per_mode": 1,
+  "order": [
+    [
+      "plain",
+      "compile_off",
+      "runtime_off",
+      "badge",
+      "play_batch"
+    ],
+    [
+      "compile_off",
+      "runtime_off",
+      "badge",
+      "play_batch",
+      "plain"
+    ],
+    [
+      "runtime_off",
+      "badge",
+      "play_batch",
+      "plain",
+      "compile_off"
+    ],
+    [
+      "badge",
+      "play_batch",
+      "plain",
+      "compile_off",
+      "runtime_off"
+    ],
+    [
+      "play_batch",
+      "plain",
+      "compile_off",
+      "runtime_off",
+      "badge"
+    ],
+    [
+      "plain",
+      "compile_off",
+      "runtime_off",
+      "badge",
+      "play_batch"
+    ],
+    [
+      "compile_off",
+      "runtime_off",
+      "badge",
+      "play_batch",
+      "plain"
+    ],
+    [
+      "runtime_off",
+      "badge",
+      "play_batch",
+      "plain",
+      "compile_off"
+    ],
+    [
+      "badge",
+      "play_batch",
+      "plain",
+      "compile_off",
+      "runtime_off"
+    ],
+    [
+      "play_batch",
+      "plain",
+      "compile_off",
+      "runtime_off",
+      "badge"
+    ]
+  ],
+  "corpus": {
+    "bytes": 10485762,
+    "sha256": "2b7cccee56e8d183db6354831675b22fa84388cda41b6e206c17ebf741eb11ab",
+    "numbers": 1966080,
+    "expected_shifts": 3932162,
+    "pattern": [
+      "0",
+      "1",
+      "-7",
+      "12",
+      "123",
+      "1024",
+      "-65536",
+      "987654321",
+      "3.14159",
+      "-0.125",
+      "42.5",
+      "1000000"
+    ],
+    "shape": "flat numeric array; repeated mixed magnitudes and decimals"
+  },
+  "settings": {
+    "sound": "off",
+    "profile": "off",
+    "flash": "off",
+    "replay": "highlight",
+    "duration": 0.1
+  },
+  "measurement": "C CLOCK_MONOTONIC immediately around yyparse; whole process includes startup and finishing replay",
+  "build": {
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "flags": [
+      "-O2",
+      "-std=c99",
+      "-Wall",
+      "-Wextra",
+      "-D_POSIX_C_SOURCE=200809L"
+    ],
+    "generation_diagnostics": {
+      "plain": "racc/parser.rb:204: warning: racc/cparse is found in racc, which is not part of the default gems since Ruby 3.3.0.\nYou can add racc to your Gemfile or gemspec to fix this error.\n",
+      "instrumented": "racc/parser.rb:204: warning: racc/cparse is found in racc, which is not part of the default gems since Ruby 3.3.0.\nYou can add racc to your Gemfile or gemspec to fix this error.\n"
+    },
+    "compilation_diagnostics": {
+      "plain": "grammar.y:58:44: warning: unused parameter 'loc' [-Wunused-parameter]\n   58 | static int yylex(YYSTYPE *yylval, YYLTYPE *loc) {\n      |                                            ^\ngrammar.y:129:29: warning: unused parameter 'loc' [-Wunused-parameter]\n  129 | static int yyerror(YYLTYPE *loc, const char *s) {\n      |                             ^\n2 warnings generated.\n",
+      "compile_off": "grammar.y:58:44: warning: unused parameter 'loc' [-Wunused-parameter]\n   58 | static int yylex(YYSTYPE *yylval, YYLTYPE *loc) {\n      |                                            ^\ngrammar.y:129:29: warning: unused parameter 'loc' [-Wunused-parameter]\n  129 | static int yyerror(YYLTYPE *loc, const char *s) {\n      |                             ^\n2 warnings generated.\n",
+      "instrumented": "grammar.y:58:44: warning: unused parameter 'loc' [-Wunused-parameter]\n   58 | static int yylex(YYSTYPE *yylval, YYLTYPE *loc) {\n      |                                            ^\ngrammar.y:129:29: warning: unused parameter 'loc' [-Wunused-parameter]\n  129 | static int yyerror(YYLTYPE *loc, const char *s) {\n      |                             ^\n2 warnings generated.\n"
+    },
+    "source_sha256": {
+      "plain": "677ef24d8945c101ae6bc159860ed180ee4b9a0eac05173243630a8ff7eedd0a",
+      "instrumented": "f689fda973ca42d21c9de9e9c68fd842505eb5104e7bd1c90c9dffc792549f46"
+    }
+  },
+  "results": {
+    "plain": {
+      "parse_median_ms": 260.4785,
+      "whole_process_median_ms": 278.68499999749474,
+      "overhead_percent": 0.0,
+      "target_overhead_percent": null,
+      "meets_target": null,
+      "samples": [
+        {
+          "parse_seconds": 0.260488,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2794620000058785,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.244008,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.27059600001666695,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.270485,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2902740000281483,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.271857,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.28892899997299537,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.23718,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2513240000116639,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.234717,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2502490000333637,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.261712,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2817720000166446,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.260469,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2713410000433214,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.263068,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2795870000263676,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.258609,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.277907999989111,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        }
+      ]
+    },
+    "compile_off": {
+      "parse_median_ms": 234.09249999999997,
+      "whole_process_median_ms": 248.70799999916926,
+      "overhead_percent": -10.129818775829879,
+      "target_overhead_percent": null,
+      "meets_target": null,
+      "samples": [
+        {
+          "parse_seconds": 0.233778,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24443900003097951,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.259144,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2800009999773465,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.235476,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2520920000388287,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.231804,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24595700000645593,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.234009,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2499299999908544,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.234176,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24543499998981133,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.264409,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2866609999909997,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.228567,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24375700001837686,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.238642,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.25226700003258884,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.233708,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2474860000074841,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        }
+      ]
+    },
+    "runtime_off": {
+      "parse_median_ms": 235.043,
+      "whole_process_median_ms": 250.01799999154173,
+      "overhead_percent": -9.7649134189578,
+      "target_overhead_percent": 2,
+      "meets_target": true,
+      "samples": [
+        {
+          "parse_seconds": 0.232673,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24887099995976314,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.230724,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24654700001701713,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.228783,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24509299994679168,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.23385,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2505140000139363,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.236557,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2516689999611117,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.234729,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24952199996914715,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.235825,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2518689999706112,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.238059,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.25220099999569356,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.235357,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.24862700002267957,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        },
+        {
+          "parse_seconds": 0.245496,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": false,
+          "flush": "unset",
+          "whole_process_seconds": 0.2564439999987371,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 83
+        }
+      ]
+    },
+    "badge": {
+      "parse_median_ms": 256.695,
+      "whole_process_median_ms": 269.3429999926593,
+      "overhead_percent": -1.4525191138616056,
+      "target_overhead_percent": 3,
+      "meets_target": true,
+      "samples": [
+        {
+          "parse_seconds": 0.247318,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.26221200003055856,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.251825,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.26715700002387166,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.312584,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.3287300000083633,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.253133,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.2681180000072345,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.265691,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.28141200001118705,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.258564,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.2730419999570586,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.257339,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.2693710000021383,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.256051,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.2693149999831803,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.254718,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.2669760000426322,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        },
+        {
+          "parse_seconds": 0.257974,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "unset",
+          "tokens": 3932162,
+          "whole_process_seconds": 0.2736530000111088,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 138
+        }
+      ]
+    },
+    "play_batch": {
+      "parse_median_ms": 257.662,
+      "whole_process_median_ms": 1406.9460000027902,
+      "overhead_percent": -1.0812792610522592,
+      "target_overhead_percent": 30,
+      "meets_target": true,
+      "samples": [
+        {
+          "parse_seconds": 0.26001,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 131,
+            "reductions": 130,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 2745,
+            "folded_events": 370,
+            "success": false
+          },
+          "whole_process_seconds": 1.4053940000012517,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 12275
+        },
+        {
+          "parse_seconds": 0.25377,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 130,
+            "reductions": 132,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 2941,
+            "folded_events": 371,
+            "success": false
+          },
+          "whole_process_seconds": 1.4040870000026189,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 12836
+        },
+        {
+          "parse_seconds": 0.251668,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 130,
+            "reductions": 132,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 3137,
+            "folded_events": 371,
+            "success": false
+          },
+          "whole_process_seconds": 1.3972049999865703,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 12006
+        },
+        {
+          "parse_seconds": 0.301614,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 131,
+            "reductions": 130,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 3333,
+            "folded_events": 369,
+            "success": false
+          },
+          "whole_process_seconds": 1.4513910000096075,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 14035
+        },
+        {
+          "parse_seconds": 0.248933,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 130,
+            "reductions": 132,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 2549,
+            "folded_events": 371,
+            "success": false
+          },
+          "whole_process_seconds": 1.3812009999528527,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 12041
+        },
+        {
+          "parse_seconds": 0.255314,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 131,
+            "reductions": 130,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 2745,
+            "folded_events": 371,
+            "success": false
+          },
+          "whole_process_seconds": 1.4160429999465123,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 10924
+        },
+        {
+          "parse_seconds": 0.255032,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 130,
+            "reductions": 132,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 3529,
+            "folded_events": 371,
+            "success": false
+          },
+          "whole_process_seconds": 1.3955670000286773,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 12662
+        },
+        {
+          "parse_seconds": 0.269354,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 131,
+            "reductions": 130,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 3137,
+            "folded_events": 370,
+            "success": false
+          },
+          "whole_process_seconds": 1.4246150000253692,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 12288
+        },
+        {
+          "parse_seconds": 0.268005,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 130,
+            "reductions": 132,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 1765,
+            "folded_events": 370,
+            "success": false
+          },
+          "whole_process_seconds": 1.4084980000043288,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 11977
+        },
+        {
+          "parse_seconds": 0.267156,
+          "parse_result": 0,
+          "stdin_tty": false,
+          "stdout_tty": false,
+          "stderr_tty": true,
+          "flush": "batch",
+          "events": {
+            "tokens": 130,
+            "reductions": 132,
+            "acceptances": 0,
+            "approximate": true,
+            "discarded_events": 2941,
+            "folded_events": 370,
+            "success": false
+          },
+          "whole_process_seconds": 1.4154410000192001,
+          "status": 0,
+          "stdout_sha256": "7acb059e720c414fec4d7f25b4fe3f3ebc0ef98b073d597f88e094969e073e52",
+          "stderr_bytes": 11977
+        }
+      ]
+    }
+  },
+  "compile_off_equivalence_follow_up": {
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "flags": [
+      "-O2",
+      "-std=c99",
+      "-Wall",
+      "-Wextra",
+      "-D_POSIX_C_SOURCE=200809L"
+    ],
+    "source_sha256": {
+      "plain": "677ef24d8945c101ae6bc159860ed180ee4b9a0eac05173243630a8ff7eedd0a",
+      "instrumented": "f689fda973ca42d21c9de9e9c68fd842505eb5104e7bd1c90c9dffc792549f46"
+    },
+    "text_section_identical": true,
+    "text_section_sha256": {
+      "plain": "785333fd0161c87ed7bc6bfb1f37a6a1d6427f308bd5957dbbf54d5e9f832c55",
+      "compile_off": "785333fd0161c87ed7bc6bfb1f37a6a1d6427f308bd5957dbbf54d5e9f832c55"
+    },
+    "optimized_assembly_identical": true,
+    "optimized_assembly_sha256": {
+      "plain": "a0e7c79726d9f7b2eb5cf9b763e374d58ec1ba25bc734f2d2623c1e481f1c112",
+      "compile_off": "a0e7c79726d9f7b2eb5cf9b763e374d58ec1ba25bc734f2d2623c1e481f1c112"
+    },
+    "checked_at": "2026-11-09T14:11:31.640888+00:00",
+    "method": "Separate rebuild; compare compiler -S output after removing .file directives, and otool -s __TEXT __text output after removing its two filename/section header lines. No timing measurements were repeated."
+  }
+}
