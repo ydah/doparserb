@@ -2,12 +2,14 @@
 
 A parser generator built on [lrama](https://github.com/ruby/lrama), with terminal shows for generating and running parsers. Watch states form, conflicts resolve, and C code get forged. Use `play` to see shifts, reductions, chains, error recovery, and a growing stack tower.
 
-Effects use [dopairb](https://github.com/ko1/dopairb)'s terminal and sound components. Original diagnostics, program output, and exit statuses remain intact.
+Effects use [dopairb](https://github.com/ko1/dopairb)'s terminal and sound components: large rainbow lettering, original ASCII llamas and conflict bosses, forge sparks, shockwaves, fireworks, and spinning jackpot reels. Playback animates colored stack blocks between events. Original diagnostics, program output, and exit statuses remain intact.
+
+![Generation and playback effects rendered at 80 columns](docs/visual-preview.png)
 
 ```console
-$ bundle exec doparserb -d grammar.y -o parser.c
+$ bundle exec ruby exe/doparserb -d grammar.y -o parser.c
 $ cc parser.c -o parser
-$ bundle exec doparserb play -- ./parser
+$ bundle exec ruby exe/doparserb play -- ./parser
 ```
 
 See the [generation recording](docs/recording/generation-calc.cast), [calculator recording](docs/recording/play-calc.cast), and [recovery recording](docs/recording/play-comeback.cast). These are asciinema v2 files.
@@ -22,7 +24,7 @@ Use the checkout and its pinned dependencies:
 $ git clone https://github.com/ydah/doparserb
 $ cd doparserb
 $ bundle install
-$ bundle exec doparserb --dopa-help
+$ bundle exec ruby exe/doparserb --dopa-help
 ```
 
 Ruby 3.3 or later and a POSIX environment are required. Development uses Ruby 4.0.9, lrama master `263a3a4`, and dopairb `da3303c`, pinned in [Gemfile](Gemfile). The generated parser needs a C99 compiler and no additional runtime library.
@@ -30,28 +32,28 @@ Ruby 3.3 or later and a POSIX environment are required. Development uses Ruby 4.
 For a runnable calculator from the checkout:
 
 ```console
-$ bundle exec doparserb test/fixtures/runtime_calc.y -o calc.c
+$ bundle exec ruby exe/doparserb test/fixtures/runtime_calc.y -o calc.c
 $ cc -std=c99 calc.c -o calc
-$ bundle exec doparserb play -- ./calc
+$ bundle exec ruby exe/doparserb play -- ./calc
 1+2*3
 ```
 
 ## Usage
 
 ```console
-$ bundle exec doparserb -d grammar.y -o parser.c
-$ bundle exec doparserb --dopa=calm grammar.y
-$ bundle exec doparserb --dopa=party grammar.y
-$ bundle exec doparserb --dopa-set flash=off,sound=off grammar.y
-$ bundle exec doparserb --dopa=off --dopa-runtime=off grammar.y
-$ bundle exec doparserb --dopa-meta=sidecar grammar.y -o parser.c
-$ bundle exec doparserb play --replay=full --speed=20 -- ./parser
-$ bundle exec doparserb play --replay=off -- ./parser < input.txt
-$ bundle exec doparserb watch grammar.y -o parser.c
-$ bundle exec doparserb demo
-$ bundle exec doparserb status
-$ bundle exec doparserb ranch
-$ bundle exec doparserb ranch tour
+$ bundle exec ruby exe/doparserb -d grammar.y -o parser.c
+$ bundle exec ruby exe/doparserb --dopa=calm grammar.y
+$ bundle exec ruby exe/doparserb --dopa=party grammar.y
+$ bundle exec ruby exe/doparserb --dopa-set flash=off,sound=off grammar.y
+$ bundle exec ruby exe/doparserb --dopa=off --dopa-runtime=off grammar.y
+$ bundle exec ruby exe/doparserb --dopa-meta=sidecar grammar.y -o parser.c
+$ bundle exec ruby exe/doparserb play --replay=full --speed=20 -- ./parser
+$ bundle exec ruby exe/doparserb play --replay=off -- ./parser < input.txt
+$ bundle exec ruby exe/doparserb watch grammar.y -o parser.c
+$ bundle exec ruby exe/doparserb demo
+$ bundle exec ruby exe/doparserb status
+$ bundle exec ruby exe/doparserb ranch
+$ bundle exec ruby exe/doparserb ranch tour
 ```
 
 Generation accepts lrama's arguments. `--help` and `--version` are lrama's output; `--dopa-help` explains the additional options. Put playback options before `--` and the child command after it. Use paths such as `./play` for grammar files named after a subcommand.
@@ -86,7 +88,9 @@ Use `--dopa-set KEY=VALUE,...` or `DOPAPARSER="KEY=VALUE,..."`. Command-line set
 | `replay` | `highlight`, `full`, `off` | `highlight` |
 | `speed` | `1`–`2000` events/second | `30` |
 
-Effects are synthesized and cached locally. The adapter uses an available system player and falls back to the terminal bell. `sound=off` skips audio work. Flashing, motion, and sound can all be disabled before the first launch.
+Use `--dopa=calm` for shorter, smaller effects without flashes or sound. Add `--dopa-set motion=off` to disable animation. `NO_COLOR` removes color while preserving the text and art.
+
+Sound effects are synthesized and cached locally. The adapter uses an available system player and falls back to the terminal bell. `sound=off` skips audio work. Flashing, motion, and sound can all be disabled before the first launch.
 
 Runtime weaving and metadata storage affect generated files, so `--dopa-runtime=on|off` and `--dopa-meta=embed|sidecar` are command-line options only.
 

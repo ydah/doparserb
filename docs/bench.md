@@ -55,3 +55,14 @@ The PTY cancellation test verifies that a pending key is still available after t
 The final event-burst run exceeds the maximum target by 0.073 ms; the final sidecar run meets it. No output was lost. All samples are in [bench-relay-final.json](bench-relay-final.json) and [bench-relay-sidecars-final.json](bench-relay-sidecars-final.json). The earlier M5 runs remain in [bench-relay.json](bench-relay.json) and [bench-relay-sidecars.json](bench-relay-sidecars.json), with maxima of 4.781 ms and 5.757 ms. The latter exceeded the bound by 0.757 ms. These tail-latency observations remain reported deviations; scheduling and PTY-reader costs are included, and the measurements do not establish a universal 5 ms guarantee.
 
 Bounding event work to one millisecond and checking child output between datagrams reduced the initial event-burst maximum from 9.139 ms. Sidecar lookup now runs asynchronously; a focused 128-file lookup submission measured 0.111 ms versus 119.994 ms when synchronous. A terminal-control bootstrap adds about 19.6 ms to median launch-to-exit time in a 20-run Ruby-child probe, preserving raw input, configured interrupt characters, and ordinary signal handling.
+
+### Arcade presentation refresh
+
+On 2026-11-10, the richer renderer and continuous playback animation were measured with the same 100-line benchmark after tests and recording jobs completed. All child-output lines survived in both runs.
+
+| Case | Median | p95 | Maximum | Maximum target |
+| --- | ---: | ---: | ---: | ---: |
+| Event bursts | 1.459 ms | 3.428 ms | 6.810 ms | 5 ms |
+| Event bursts and 128 sidecars | 1.424 ms | 2.776 ms | 4.403 ms | 5 ms |
+
+The event-burst run exceeds the maximum target by 1.810 ms; the sidecar run meets it. These are single runs including scheduling and PTY-reader costs, not universal latency guarantees. All samples are retained in [bench-relay-arcade.json](bench-relay-arcade.json) and [bench-relay-sidecars-arcade.json](bench-relay-sidecars-arcade.json). Earlier measurements above remain unchanged. The C runtime and generation collector were not modified or rebenchmarked for this presentation change.

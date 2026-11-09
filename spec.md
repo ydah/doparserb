@@ -53,6 +53,10 @@ Related document: [M0 findings](docs/m0-findings.md)
 8. **Scores are for play.** They do not evaluate grammar or code quality. Do not disproportionately reward huge grammars or inputs.
 9. **Let users choose the intensity.** Default to full intensity, with independent controls for flashing, motion, sound, and duration. Flashing can be suppressed from the first launch.
 
+The renderer uses large gradient lettering, original ASCII sprites, colored stack blocks, sparks, expanding shockwaves, and independently stopping jackpot reels. Standard generation scenes occupy up to 18 rows and playback up to 16; low intensity uses up to six. Frames always fit within the available terminal height. Compact sprites preserve their outlines when the full artwork cannot fit.
+
+Live playback animates between event boundaries without waiting for an entire scene or replaying each event's sound. The renderer caps playback at 40 frames per second. Program output and cancellation interrupt the animation. Standalone rendering uses Unicode-neutral braille pixels with colored cell backgrounds; ambiguous block glyphs retain the upstream width fallback. NO_COLOR removes color and styling while keeping the text and motion controls independent.
+
 ## 3. Architecture
 
 ```mermaid

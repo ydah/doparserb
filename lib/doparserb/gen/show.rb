@@ -56,7 +56,8 @@ module Doparserb
         engine.session do
           Scenes::KINDS.each do |kind|
             break if engine.cancelled?
-            scene = Scenes.build(kind, Scenes::DEMO_STATS)
+            stats = %i[boss expect_mismatch].include?(kind) ? Scenes::DEMO_STATS.merge(sr_conflicts: 3, rr_conflicts: 1) : Scenes::DEMO_STATS
+            scene = Scenes.build(kind, stats)
             engine.scene(scene.kind, title: scene.title, subtitle: scene.subtitle,
                          data: scene.data, duration: 0.6 * config.duration)
           end

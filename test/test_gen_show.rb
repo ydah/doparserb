@@ -87,7 +87,7 @@ class GenShowTest < Test::Unit::TestCase
     assert_equal("red\e[2K", output.string)
   end
 
-  def test_scenes_render_visible_ascii_frames_that_fit_the_canvas
+  def test_scenes_render_visible_frames_with_only_trusted_art_glyphs
     config = Doparserb::Config.new(settings: ["sound=off,color=none"], env: {})
     engine = Doparserb::Engine.new(config, output: StringIO.new)
     Doparserb::Gen::Scenes::KINDS.each do |kind|
@@ -97,7 +97,7 @@ class GenShowTest < Test::Unit::TestCase
       lines.each do |line|
         plain = line.gsub(/\e\[[\d;]*m/, "")
         assert_compare(plain.length, :<=, 60, kind.to_s)
-        assert(plain.delete("▀▄█").ascii_only?, kind.to_s)
+        assert_no_match(/[^\x20-\x7e\u2580-\u259f\u2800-\u28ff]/, plain, kind.to_s)
       end
     end
   end

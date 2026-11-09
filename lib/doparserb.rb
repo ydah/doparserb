@@ -20,6 +20,7 @@ module Doparserb
   autoload :Ranch, "doparserb/ranch"
   autoload :SoundBank, "doparserb/sound_bank"
   autoload :Watch, "doparserb/watch"
+  autoload :Art, "doparserb/art"
 
   module Gen
     autoload :Collector, "doparserb/gen/collector"

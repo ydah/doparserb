@@ -111,6 +111,14 @@
 - Next: no implementation milestone remains. Platform execution, physical audio listening, and complete-stream performance measurements remain follow-up validation work.
 - Decisions needed: none. The final `First implementation` commit includes the specification, README, reports, benchmark samples, and recordings.
 
+## Arcade presentation refresh
+
+- Changes: added original full and compact ASCII characters, large rainbow pixel lettering, colored backgrounds and stack blocks, sparks, shockwaves, fireworks, moving rule cards, and independently stopping jackpot reels. Generation uses up to 18 rows and playback up to 16. Playback now paints intermediate animation frames without repeating event sounds; the demo holds parse scenes longer.
+- Validation: 520 tests and 10,369 assertions passed in 164.636 seconds, with zero failures, errors, pendings, omissions, or notifications. This run excludes the unchanged 10,000-input C fuzz test; the earlier full-suite result remains above. Tests cover animation timing, output priority, cancellation, NO_COLOR, hostile labels, narrow layouts, glyph-width fallback, and spinning reels. Independent review found no remaining blocker.
+- Visual inspection: six actual ANSI frames were rendered to the [preview](visual-preview.png), inspected, and refined for readable headings and connected compact sprites. All nine recordings were refreshed and reconstructed with no unknown terminal controls or screen-bound violations.
+- Performance: relay medians were 1.459 ms and 1.424 ms with 128 sidecars; maxima were 6.810 ms and 4.403 ms. The first exceeds the 5 ms target by 1.810 ms. No child output was lost. Raw samples and limitations are in [bench.md](bench.md#arcade-presentation-refresh).
+- Remaining checks: physical terminal/font combinations, physical audio, and Linux were not verified locally. The generated C runtime and its documented backpressure cutoff remain unchanged.
+
 ## Final acceptance checklist
 
 - [x] Full-off compatibility: the 13-grammar × 13-option golden matrix matches pinned lrama artifacts, diagnostics, and statuses, using only the approved comparison normalization.

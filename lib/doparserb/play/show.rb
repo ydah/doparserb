@@ -6,6 +6,8 @@ module Doparserb
       MAX_PENDING = 2048
       MAX_TOWERS = 128
       HIGHLIGHT_FRAMES = 12
+      ANIMATION_DURATION = 0.35
+      DEMO_DURATION = 0.55
       TOTAL_FIELDS = %i[tokens reductions errors repairs inserted discarded].freeze
 
       attr_reader :folded_events
@@ -30,7 +32,7 @@ module Doparserb
           Scenes::KINDS.each do |kind|
             break if engine.cancelled?
             scene = Scenes.build(kind, Scenes::DEMO_STATS)
-            engine.scene(kind, title: scene.title, subtitle: scene.subtitle, data: scene.data, duration: 0.18 * config.duration)
+            engine.scene(kind, title: scene.title, subtitle: scene.subtitle, data: scene.data, duration: DEMO_DURATION * config.duration)
           end
           engine.badge("* DOPARSERB DEMO * ALL PARSE SCENES")
         end
@@ -77,6 +79,7 @@ module Doparserb
       def tick(now: @clock.call)
         return if @done || @output_open && !@finished
         if @queue.empty? && !@finished
+          animate_current(now)
           @next_at = nil if @next_at && now >= @next_at
           return
         end
@@ -87,28 +90,40 @@ module Doparserb
           count.times do
             break if @queue.empty? || now + 1e-9 < @next_at
             scene = @queue.shift
+            interval = @interval || (@config.replay == :full ? 1.0 / @config.speed : 0.025)
+            @animation_started = nil
             safely do
               names = @names[scene.data[:event].values_at(:parser, :pid, :parse_id)]
               scene = Scenes.relabel(scene, names) if names
-              @engine.frame(scene.kind, title: scene.title, subtitle: scene.subtitle, data: scene.data, progress: 1.0)
+              tween = @engine.respond_to?(:animate)
+              @engine.frame(scene.kind, title: scene.title, subtitle: scene.subtitle, data: scene.data, progress: tween ? 0.0 : 1.0)
+              if tween
+                @animation_started = now
+                duration = ANIMATION_DURATION * @config.duration
+                @animation_duration = @queue.empty? && !@finished ? duration : [duration, interval].min
+              end
             end
-            @next_at += @interval || (@config.replay == :full ? 1.0 / @config.speed : 0.025)
+            @next_at += interval
           end
         end
+        animate_current(now)
         complete if @finished && @queue.empty? && now >= @next_at
       rescue StandardError => error
         Doparserb.debug(error)
         @queue.clear
+        @animation_started = nil
         complete if @finished
       end
 
       def yield_to_output(bytes = nil)
+        @animation_started = nil
         safely { @engine.yield_to_output }
         @output_open = !bytes.end_with?("\n") if bytes && !bytes.empty?
         @next_at = nil
       end
 
       def cancel
+        @animation_started = nil
         safely { @engine.silence if @engine.respond_to?(:silence) }
         @queue.clear
         @strongest = nil
@@ -124,6 +139,7 @@ module Doparserb
         decorate_ending if @result
         if @output_open || !animated?
           @queue.clear
+          @animation_started = nil
         elsif @config.replay == :highlight
           prepare_highlight
         end
@@ -132,6 +148,17 @@ module Doparserb
       end
 
       private
+
+      def animate_current(now)
+        return unless @animation_started
+        progress = ((now - @animation_started) / @animation_duration).clamp(0.0, 1.0)
+        return unless progress.positive?
+        @engine.animate(progress: progress)
+        @animation_started = nil if progress == 1.0
+      rescue StandardError => error
+        @animation_started = nil
+        Doparserb.debug(error)
+      end
 
       def animated?
         !@config.off? && @config.motion && @config.replay != :off && @engine.animated?
@@ -175,6 +202,7 @@ module Doparserb
 
       def complete
         @done = true
+        @animation_started = nil
         safely { @engine.clear }
         return if @config.off? || @config.trail != :badge || !@last
         totals = @retired.dup

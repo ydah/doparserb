@@ -9,6 +9,7 @@ require "dopairb/color"
 require "dopairb/term"
 require "dopairb/canvas"
 require "dopairb/font"
+require "dopairb/fx"
 require "dopairb/stage"
 require "dopairb/sound"
 require "dopairb/output_tap"
@@ -24,6 +25,21 @@ module Doparserb
     SOUND_MAX_DELAY = 0.15
     SOUND_PLAYER_LIMIT = 4
     SOUND_LOCK = Mutex.new
+    ART_GLYPHS = /[\u2580-\u259f\u2800-\u28ff]/
+    INK = [9, 14, 30].freeze
+    CYAN = [61, 232, 255].freeze
+    PINK = [255, 79, 163].freeze
+    GOLD = [255, 212, 92].freeze
+    MINT = [112, 242, 176].freeze
+    VIOLET = [155, 123, 255].freeze
+
+    # Braille is Unicode-neutral; ambiguous block widths retain the upstream fallback.
+    original_width = Dopairb::Term.method(:char_width)
+    Dopairb::Term.singleton_class.remove_method(:char_width)
+    Dopairb::Term.define_singleton_method(:char_width) do |char|
+      !defined?(Reline::Unicode) && char.match?(/[\u2800-\u28ff]/) ? 1 : original_width.call(char)
+    end
+    Dopairb::Term.reset_glyphs
 
     module SoundPatches
       def key_for(name, stretch)
@@ -192,8 +208,18 @@ module Doparserb
     end
 
     def frame(kind, title:, subtitle: "", progress: 1.0, data: {})
+      @animation_frame = {kind: kind, title: title, subtitle: subtitle, data: data} if data[:play]
+      paint_frame(kind: kind, title: title, subtitle: subtitle, progress: progress, data: data, audio: true)
+    end
+
+    def animate(progress:)
+      return unless @animation_frame
+      paint_frame(**@animation_frame, progress: progress, audio: false)
+    end
+
+    def paint_frame(kind:, title:, subtitle: "", progress: 1.0, data: {}, audio: false)
       return unless animated? && !cancelled? && !@paused
-      if !@scene_sound && (data[:play] || %i[title charging].include?(kind) && @live_sound_kind != kind)
+      if audio && !@scene_sound && (data[:play] || %i[title charging].include?(kind) && @live_sound_kind != kind)
         sound(kind, data)
       end
       @live_sound_kind = kind
@@ -203,7 +229,7 @@ module Doparserb
         @play_frame_at = timestamp + 0.025
       end
       rows, cols = dimensions
-      height = kind == :charging ? 1 : [rows - 2, config.intensity == :low ? 6 : 10].min
+      height = kind == :charging ? 1 : [rows - 2, config.intensity == :low ? 6 : data[:play] ? 16 : 18].min
       width = [cols - 1, 120].min
       lines = render(kind, title: title, subtitle: subtitle, progress: progress, data: data, width: width, height: height)
       Dopairb::Term::LOCK.synchronize do
@@ -283,27 +309,25 @@ module Doparserb
       return render_ranch(kind, title, subtitle, progress, data, width, height) if %i[ranch llama_drop].include?(kind)
       return render_tower(kind, title, subtitle, progress, data, width, height) if data[:play]
       canvas = Dopairb::Canvas.new(width, height)
-      color = palette(kind, progress)
-      canvas.put_center(0, crop(title, width), color, bold: true)
-      if config.flash != :off && progress.between?(0.45, 0.53) && config.color != :none
-        canvas.fill_bg(Dopairb::Color.scale(color, 0.18))
-      end
-      draw_art(canvas, kind, progress, color, data)
-      if %i[title flawless finale states record jackpot].include?(kind) && height >= 9
-        word = case kind
-               when :title then "DOPARSERB"
-               when :states then (data[:states].to_i * progress).ceil.to_s
-               when :finale then "CLEAR!"
-               when :jackpot then "7 7 7"
-               else title.delete("!")
-               end
-        draw_font(canvas, word, progress, color) if Dopairb::Font.width(word) <= width - 2
-      end
-      text = crop(subtitle, subtitle.length)
-      offset = ([text.length - width * 2, 0].max * progress).floor
-      footer = text[offset, width * 2].scan(/.{1,#{[width, 1].max}}/)
-      footer.first(2).each_with_index { |line, index| canvas.put_center(height - 2 + index, line, color) }
-      canvas.render(depth).map { |line| crop(line, width) }
+      backdrop(canvas, kind, progress)
+      word = case kind
+             when :title then "DOPARSERB"
+             when :states then (data[:states].to_i * Dopairb::Fx.ease_out(progress)).ceil.to_s
+             when :finale then data[:rank] ? "RANK #{data[:rank]}" : "CLEAR!"
+             when :flawless then "FLAWLESS"
+             when :grammar_break then "BREAK"
+             when :expect_mismatch then "EXPECT"
+             when :new_ability then "UNLOCK"
+             when :achievement then "UNLOCKED"
+             when :jackpot then "JACKPOT"
+             when :boss then "BOSS"
+             else title.delete("!")
+             end
+      draw_art(canvas, kind, progress, data, height >= 14 ? 8 : 3)
+      headline(canvas, word, progress, y: 2, color: palette(kind, progress)) if height >= 14 && width >= 40
+      header(canvas, title, kind, progress)
+      footer(canvas, subtitle, progress)
+      finish_canvas(canvas)
     end
 
     private
@@ -332,42 +356,173 @@ module Doparserb
 
     def render_tower(kind, title, subtitle, progress, data, width, height)
       canvas = Dopairb::Canvas.new(width, height)
+      backdrop(canvas, kind, progress)
       fever = data.dig(:game, :fever)
       color = fever ? Dopairb::Color.rainbow(data[:game][:combo].fdiv(12) % 1) : palette(kind, progress)
-      canvas.put(0, 0, crop("STACK TOWER", width), color, bold: true)
-      preview_width = [width / 3, 20].min
+      preview_width = [width / 3, 24].min
       preview_left = width - preview_width
-      canvas.put(preview_left, 0, "NEXT", color, bold: true)
-      canvas.put(preview_left, 1, crop(data.dig(:next_token, :label) || "-", preview_width), color)
-      canvas.put(0, 1, crop("DEPTH #{data[:depth]}F", preview_left - 1), color)
       hud = "CHAIN #{data[:chain]}"
       hud += "  COMBO #{data[:game][:combo]}#{fever ? '  FEVER!' : ''}" if data[:game]
-      canvas.put(0, 2, crop(hud, width), color, bold: true)
       floor = height - 3
-      blocks = data.fetch(:blocks, []).last([floor - 2, 0].max)
-      block_width = [preview_left - 2, 28].min.clamp(4, [width, 4].max)
-      blocks.reverse_each.with_index do |block, index|
-        row = floor - blocks.size + index + 1
-        label = crop(block[:label] || (block[:sym] ? "SYM #{block[:sym]}" : "RULE #{block[:rule]}"), block_width - 4)
-        block_color = Dopairb::Color.rainbow((block[:sym] || block[:rule]).to_i.fdiv(11) % 1)
-        canvas.put(1, row, crop("[ #{label.ljust(block_width - 4)} ]", width - 1), block_color, bold: true)
+      blocks = data.fetch(:blocks, []).last([floor - 3, 1].max)
+      block_width = [width >= 64 ? width / 2 - 5 : preview_left - 2, 30].min.clamp(4, [width, 4].max)
+      left = width >= 64 ? 3 : 1
+      canvas.put(left, floor, "=" * block_width, VIOLET)
+      panel_left = width >= 64 ? width / 2 : preview_left
+      panel_width = width - panel_left
+      label = case kind
+              when :chain then "#{data[:chain]} CHAIN"
+              when :stage_clear then "CLEAR"
+              when :comeback then "BACK!"
+              when :auto_repair, :repair_plan, :inserted, :recovery then "REPAIR"
+              when :syntax_break, :collapse, :exhausted, :aborted then "BREAK"
+              when :tower_milestone then "#{data[:max_depth]}F"
+              when :token_milestone then "#{data[:tokens].to_i / 1000}K"
+              else kind.to_s.upcase.tr("_", " ")
+              end
+      burst(canvas, left + block_width / 2, [floor - blocks.size, 4].max, progress, color: color)
+      if %i[reduce chain].include?(kind)
+        spread = (6 * (1 - progress)).round
+        canvas.put(left + block_width / 2 - spread - 3, 3, ">>>", CYAN)
+        canvas.put(left + block_width / 2 + spread, 3, "<<<", PINK)
+      elsif %i[recovery auto_repair inserted repair_plan].include?(kind)
+        4.times { |index| canvas.put(panel_left + (index * 7) % panel_width, 3 + ((index + progress * 5) % [height - 6, 1].max), "+", MINT, bold: true) }
+      elsif %i[stage_clear comeback jackpot].include?(kind)
+        3.times { |index| burst(canvas, width * (index + 1) / 4, 4 + index % 2, (progress + index * 0.2) % 1, color: [GOLD, PINK, CYAN][index]) }
       end
-      effect = case kind
-               when :shift, :tower_milestone then "* + *"
-               when :reduce, :chain then "-> * <-"
-               when :from_nothing then "+ * +"
-               when :syntax_break, :collapse then "/ ! \\"
-               when :recovery then "[ERROR]"
-               when :repair_plan, :inserted, :auto_repair then "+ -> []"
-               when :stage_clear, :comeback then "* ^ *"
-               when :critical then "/ x#{data.fetch(:multiplier, 4)} /"
-               when :jackpot then "7 7 7"
-               else ""
-               end
-      canvas.put(preview_left, 3, crop(effect, preview_width), color)
+      if width >= 64 && height >= 12
+        headline(canvas, label, progress, y: 4, left: panel_left, width: panel_width, half: true, color: color)
+        sprite = case kind
+                 when :stage_clear, :comeback, :token_milestone then :trophy
+                 when :repair_plan, :inserted, :auto_repair, :recovery then :shield
+                 when :syntax_break, :collapse, :exhausted, :aborted then :boss
+                 when :jackpot then :slots
+                 else :llama
+                 end
+        draw_sprite(canvas, sprite, panel_left + panel_width / 2, 9, progress, limit: height - 11)
+      else
+        canvas.put(panel_left, 4, crop(label, panel_width), color, bold: true)
+      end
+      blocks.reverse_each.with_index do |block, index|
+        row = floor - blocks.size + index
+        row -= ((1 - Dopairb::Fx.ease_in([progress * 2, 1].min)) * 3).round if index.zero? && kind == :shift
+        row = [row, 3].max
+        label = crop(block[:label] || (block[:sym] ? "SYM #{block[:sym]}" : "RULE #{block[:rule]}"), block_width - 4)
+        block_color = Dopairb::Color.rainbow((block[:sym] || block[:rule]).to_i.fdiv(11) % 1, 0.65)
+        displacement = %i[reduce chain].include?(kind) && index.zero? ? ((1 - Dopairb::Fx.ease_out(progress)) * 4).round : 0
+        canvas.put(left + displacement, row, "[ #{label.ljust(block_width - 4)} ]",
+                   [250, 250, 255], bg: Dopairb::Color.scale(block_color, 0.5), bold: true)
+        canvas.put(left + displacement, row, ">", block_color, bold: true)
+        canvas.put(left + block_width - 1 + displacement, row, "<", block_color, bold: true)
+      end
+      3.times { |row| canvas.put(0, row, " " * width, nil, bg: INK) }
+      canvas.put(0, 0, "STACK TOWER", GOLD, bold: true)
+      canvas.put(preview_left, 0, "NEXT", CYAN, bold: true)
+      canvas.put(preview_left, 1, crop(data.dig(:next_token, :label) || "-", preview_width), MINT, bold: true)
+      canvas.put(0, 1, crop("DEPTH #{data[:depth]}F", preview_left - 1), color)
+      canvas.put(0, 2, crop(hud, width), PINK, bold: true)
+      2.times { |row| canvas.put(0, height - 2 + row, " " * width, nil, bg: INK) }
       canvas.put_center(height - 2, crop(title, width), color, bold: true)
-      canvas.put_center(height - 1, crop(subtitle, width), color)
-      canvas.render(depth).map { |line| crop(line, width) }
+      canvas.put_center(height - 1, crop(subtitle, width), CYAN)
+      finish_canvas(canvas)
+    end
+
+    def backdrop(canvas, kind, progress)
+      color = palette(kind, progress)
+      canvas.h.times do |row|
+        canvas.fill_bg(Dopairb::Color.mix(INK, color, 0.04 + row.fdiv([canvas.h, 1].max) * 0.07), 0, row, canvas.w, 1)
+      end
+      count = config.intensity == :low ? 5 : 18
+      Dopairb::Fx.sparkles(canvas, progress, kind.to_s.bytes.sum, count,
+                           palette: [CYAN, PINK, GOLD, VIOLET], area: [0, 2, canvas.w, [canvas.h - 4, 1].max])
+      if config.flash != :off && progress.between?(0.45, 0.53) && config.color != :none
+        canvas.tint_bg(color, 0.2)
+      end
+    end
+
+    def header(canvas, title, kind, progress)
+      canvas.put(0, 0, " " * canvas.w, nil, bg: INK)
+      text = crop(title, canvas.w - 4)
+      canvas.put_center(0, text, GOLD, bold: true)
+      canvas.put(0, 0, ">>", palette(kind, progress))
+      canvas.put(canvas.w - 2, 0, "<<", PINK)
+    end
+
+    def footer(canvas, subtitle, progress)
+      text = crop(subtitle, subtitle.to_s.length)
+      offset = ([text.length - canvas.w * 2, 0].max * progress).floor
+      lines = text[offset, canvas.w * 2].scan(/.{1,#{canvas.w}}/)
+      2.times { |row| canvas.put(0, canvas.h - 2 + row, " " * canvas.w, nil, bg: INK) }
+      lines.first(2).each_with_index do |line, index|
+        canvas.put_center(canvas.h - 2 + index, line, index.zero? ? GOLD : CYAN)
+      end
+    end
+
+    def gradient_text(canvas, x, y, text, progress = 0)
+      text.each_char.with_index do |char, index|
+        canvas.put(x + index, y, char, Dopairb::Color.rainbow(index.fdiv([text.size, 1].max) * 0.6 + progress * 0.15), bold: true)
+      end
+    end
+
+    def headline(canvas, text, progress, y:, color:, left: 0, width: canvas.w, half: false)
+      text = crop(text, width)
+      scale = half ? 1 : Dopairb::Fx.best_scale(text, width - 4)
+      pixel_width = Dopairb::Font.width(text)
+      return unless scale && pixel_width * scale <= width - 2
+      x = left + (width - pixel_width * scale) / 2
+      y -= ((1 - Dopairb::Fx.ease_out([progress * 3, 1].min)) * 2).round
+      ink = ->(_x, row, fraction) { Dopairb::Color.mix(Dopairb::Color.rainbow(fraction * 0.65 + progress * 0.1), color, row * 0.05) }
+      background = ->(col, row) { ink.call(col, row, col.fdiv([pixel_width - 1, 1].max)) } unless config.color == :none
+      if half
+        return if Dopairb::Fx.half_text(canvas, text, x, y, ink)
+        Dopairb::Fx.big_text(canvas, text, x, y, ink, bg_fn: background)
+      else
+        if config.color != :none
+          shadow = ->(*) { Dopairb::Color.scale(color, 0.25) }
+          Dopairb::Fx.big_text(canvas, text, x + 1, y + 1, shadow, scale: scale, bg_fn: shadow)
+        end
+        Dopairb::Fx.big_text(canvas, text, x, y, ink, scale: scale,
+                            reveal: [progress * 4, 1].min, bg_fn: background)
+      end
+    end
+
+    def draw_sprite(canvas, name, center, y, progress, limit: canvas.h - y - 2)
+      rows = Art::SPRITES.fetch(name)
+      compact = Art::COMPACT_SPRITES[name]
+      rows = compact if rows.size > limit && compact && compact.size <= limit
+      if limit < rows.size
+        return if limit < 3
+        rows = Array.new(limit) { |index| rows[(index * (rows.size - 1).fdiv(limit - 1)).round] }
+      end
+      left = center - rows.map(&:length).max / 2
+      rows.each_with_index do |line, row|
+        line.each_char.with_index do |char, col|
+          next if char == " "
+          color = if "*+o".include?(char)
+                    GOLD
+                  elsif "[]=".include?(char)
+                    CYAN
+                  else
+                    Dopairb::Color.mix(PINK, MINT, (row.fdiv(rows.size) + progress * 0.3) % 1)
+                  end
+          canvas.put(left + col, y + row, char, color, bold: true)
+        end
+      end
+    end
+
+    def burst(canvas, x, y, progress, color: GOLD)
+      age = Dopairb::Fx.phase(progress, 0.25, 1)
+      Dopairb::Fx.shockwave(canvas, x, y, age * 0.48, speed: 24, palette: [[255, 255, 255], color, VIOLET], life: 0.6)
+      12.times do |index|
+        angle = index * Math::PI / 6
+        distance = 1 + age * 13
+        canvas.put(x + Math.cos(angle) * distance, y + Math.sin(angle) * distance * 0.25,
+                   index.even? ? "*" : "+", Dopairb::Color.mix(color, PINK, index.fdiv(12)))
+      end
+    end
+
+    def finish_canvas(canvas)
+      canvas.render(depth).map { |line| crop(line, canvas.w, trusted_pixels: true) }
     end
 
     def restore_flash
@@ -391,13 +546,15 @@ module Doparserb
       remaining = [width, 0].max
       text.to_s.scan(/\e\[[\d;]*m|./).filter_map do |part|
         if part.start_with?("\e[")
-          part unless config.color == :none
+          part if trusted_pixels && config.color != :none
         elsif remaining.positive?
           remaining -= 1
           if part.ascii_only? && part.ord.between?(32, 126)
             part
-          elsif trusted_pixels && %w[▀ ▄ █].include?(part)
+          elsif trusted_pixels && ART_GLYPHS.match?(part)
             Dopairb::Term.glyph(part, "#")
+          elsif trusted_pixels && %w[✦ ✧].include?(part)
+            part == "✦" ? "*" : "+"
           else
             "?"
           end
@@ -415,66 +572,124 @@ module Doparserb
       end
     end
 
-    def draw_font(canvas, text, progress, color)
-      left = (canvas.w - Dopairb::Font.width(text)) / 2
-      top = 2 - ((1 - progress) * 2).round
-      Dopairb::Font.bitmap(text).each_with_index do |row, y|
-        row.each_with_index { |pixel, x| canvas.put(left + x, top + y, "#", color) if pixel }
-      end
-    end
-
-    def draw_art(canvas, kind, progress, color, data)
+    def draw_art(canvas, kind, progress, data, row)
       middle = canvas.w / 2
-      row = [3, canvas.h - 3].min
       tick = (progress * 20).to_i
+      room = canvas.h - row - 2
       case kind
       when :title
-        x = ((canvas.w - 9) * progress).to_i
-        canvas.put(x, 6, " /|_/|", color)
-        canvas.put(x, 7, "( oo )___", color)
+        offset = ((progress - 0.5) * [canvas.w / 3, 24].min).round
+        draw_sprite(canvas, :llama, middle + offset, row, progress)
+        if canvas.w >= 64
+          gradient_text(canvas, 4, row + 2, "{ grammar }", progress)
+          gradient_text(canvas, canvas.w - 15, row + 2, "< parser.c >", progress + 0.3)
+          canvas.line(16, row + 3, middle + offset - 9, row + 3, CYAN)
+          canvas.line(middle + offset + 9, row + 3, canvas.w - 16, row + 3, PINK)
+        end
+        canvas.put(1, canvas.h - 3, "~" * (canvas.w - 2), VIOLET)
       when :scan
-        tokens = %w[%token ID NUMBER %% expr : term + expr ;]
-        canvas.put(1, row, tokens.rotate(tick % tokens.size).join(" "), color)
-        canvas.put((canvas.w * progress).to_i, row - 1, "*", color)
+        tokens = %w[%token ID NUMBER %% expr : term + expr ; %left]
+        [room, 5].min.times do |index|
+          line = tokens.rotate((tick + index * 3) % tokens.size).join(" ")
+          line.chars.first(canvas.w - 4).each_with_index do |char, col|
+            canvas.put(col + 2, row + index, char, Dopairb::Color.mix(CYAN, VIOLET, index.fdiv(5)))
+          end
+        end
+        beam = (progress * (canvas.w - 5)).round + 2
+        [room, 5].min.times { |index| canvas.put(beam, row + index, "|", GOLD, bg: Dopairb::Color.scale(PINK, 0.4), bold: true) }
+        canvas.put_center(canvas.h - 3, "[ TOKEN STREAM >>> SYMBOL TABLE ]", MINT, bold: true)
       when :loaded
-        ["[ RULES #{data[:rules]} ]", "[ TERMS #{data[:terms]} ]", "[ NTERMS #{data[:nterms]} ]"].first(1 + (progress * 2).round).each_with_index do |line, index|
-          canvas.put_center(row - 1 + index, line, color, bold: true)
+        draw_sprite(canvas, :book, canvas.w >= 70 ? canvas.w / 3 : middle, row, progress)
+        if canvas.w >= 70
+          ["RULES #{data[:rules]}", "TOKENS #{data[:terms]}", "NONTERMS #{data[:nterms]}"].each_with_index do |label, index|
+            x = canvas.w / 2 + 6 + ((1 - Dopairb::Fx.ease_out(progress)) * 8).round
+            canvas.put(x, row + index * 2, crop("[ #{label} ]", canvas.w - x), [GOLD, CYAN, PINK][index], bold: true)
+          end
         end
       when :evolve, :fusion, :split
-        offset = kind == :split ? (progress * 12).to_i : ((1 - progress) * 12).to_i
-        canvas.put(middle - offset - 6, row, "[RULE]", color)
-        canvas.put(middle + offset, row, kind == :evolve ? "[EXPR]" : "[RULE]", color)
-        canvas.put_center(row + 1, kind == :split ? "<-- + -->" : "--> * <--", color)
+        spread = (kind == :split ? progress : 1 - progress) * [canvas.w / 4, 20].min
+        ["+-------+", "| RULE  |", "+-------+"].each_with_index do |line, index|
+          canvas.put(middle - spread - 9, row + index, line, CYAN, bold: true)
+          canvas.put(middle + spread, row + index, line.sub("RULE", kind == :evolve ? "EXPR" : "RULE"), PINK, bold: true)
+        end
+        burst(canvas, middle, row + 2, progress, color: MINT)
+        canvas.put_center(canvas.h - 3, kind == :split ? "<-- DISTINCT STATES -->" : ">>> RULES COMBINE <<<", GOLD, bold: true)
+      when :states
+        columns = [[canvas.w / 8, 3].max, 12].min
+        cells = columns * [room, 5].min
+        cells.times do |index|
+          next if index > cells * progress
+          x = (canvas.w - columns * 7) / 2 + index % columns * 7
+          y = row + index / columns
+          canvas.put(x, y, "[#{format('%03d', index)}]", Dopairb::Color.rainbow(index.fdiv([cells, 1].max) * 0.7), bold: true)
+        end
+        burst(canvas, middle, row + 2, progress, color: GOLD) if progress > 0.55
       when :lookahead
-        3.times { |y| canvas.put_center(row - 1 + y, "[00] [01] [10] [11] [??]", color) }
-        canvas.put((canvas.w * progress).to_i.clamp(0, canvas.w - 1), row, "|", [255, 255, 255])
+        [room, 5].min.times do |index|
+          canvas.put_center(row + index, "[00]  [01]  [10]  [11]", [CYAN, VIOLET, PINK, GOLD, MINT][index])
+        end
+        canvas.line(middle, row + 2, middle + Math.cos(progress * Math::PI * 2) * 18,
+                    row + 2 + Math.sin(progress * Math::PI * 2) * 2, GOLD)
+        canvas.ring(middle, row + 2, 10, MINT)
       when :slash, :critical
-        [canvas.w, 1].max.times do |x|
-          y = row + ((x - middle) / 8.0).round
-          canvas.put(x, y, "/", color) if x <= canvas.w * progress
+        draw_sprite(canvas, :boss, middle + (progress > 0.5 ? (progress * 3).round : 0), row, progress)
+        canvas.w.times do |x|
+          next if x > canvas.w * [progress * 2, 1].min
+          y = row + room / 2 - (x - middle).fdiv(10)
+          canvas.put(x, y, "/", [255, 255, 255], bold: true)
+          canvas.put(x, y + 1, "/", PINK)
         end
-        canvas.put_center(row, "x#{data[:resolved_conflicts] || data[:multiplier] || 4}", color, bold: true)
+        burst(canvas, middle, row + room / 2, progress, color: PINK)
+        canvas.put_center(canvas.h - 3, "x#{data[:resolved_conflicts] || data[:multiplier] || 4}  >>> RESOLVED <<<", GOLD, bold: true)
       when :boss, :expect_mismatch
-        [" /\\    /\\ ", "(  >  <  )", " \\  /\\  / "].each_with_index { |line, index| canvas.put_center(row - 1 + index, line, color) }
+        draw_sprite(canvas, :boss, middle + (Math.sin(progress * Math::PI * 4) * 2).round, row, progress, limit: room - 1)
         hp = data[:sr_conflicts].to_i + data[:rr_conflicts].to_i
-        canvas.put_center(row + 2, "HP #{hp} [#{'=' * (12 * (1 - progress)).ceil}#{' ' * (12 * progress).floor}]", color)
+        canvas.put_center(canvas.h - 3, "HP #{hp} [#{'=' * (12 * (1 - progress)).ceil}#{' ' * (12 * progress).floor}]", PINK, bold: true)
       when :forge, :extra
-        ["   [==]", "     |    *", "  =========", "    /___\\"].each_with_index { |line, index| canvas.put_center(row - 1 + index, line, color) }
-      when :warning
-        ["   /!\\", "  / ! \\", " /_____\\"].each_with_index { |line, index| canvas.put_center(row - 1 + index, line, color) }
-      when :new_ability
-        canvas.put_center(row, "[ + ]  UNLOCKED  [ + ]", color, bold: true)
-      when :grammar_break, :validation_break
-        4.times { |y| canvas.put(middle + (y.even? ? -1 : 1), row - 1 + y, y.even? ? "/" : "\\", color) }
-        canvas.put_center(row + 1, "<  !  >", color)
-      else
-        count = {low: 4, normal: 10, max: 16}.fetch(config.intensity, 4)
-        count.times do |i|
-          angle = i * Math::PI * 2 / count
-          x = middle + Math.cos(angle) * progress * (canvas.w / 2 - 2)
-          y = row + Math.sin(angle) * progress * 2
-          canvas.put(x, y, i.even? ? "*" : "+", Dopairb::Color.rainbow(i.fdiv(count)))
+        burst(canvas, middle + 4, row + 3, progress, color: GOLD) if progress >= 0.3
+        draw_sprite(canvas, :anvil, middle, row, progress)
+        hammer_y = row + (Dopairb::Fx.ease_in([progress * 2, 1].min) * 3).round - 2
+        draw_sprite(canvas, :hammer, middle + 12, hammer_y, progress)
+        if canvas.w >= 70
+          canvas.put(3, row + 3, crop(File.basename(data[:output].to_s), 18), MINT, bold: true)
+          canvas.put(3, row + 4, "#{data[:output_lines]} LINES", CYAN)
         end
+      when :warning
+        [room, 6].min.times do |index|
+          line = index == 5 ? "/____________\\" : "#{' ' * (5 - index)} /#{' ' * index}!#{' ' * index}\\"
+          canvas.put_center(row + index, line, index.even? ? GOLD : PINK, bold: true)
+        end
+      when :new_ability, :achievement, :record, :flawless, :finale
+        draw_sprite(canvas, :trophy, middle, row, progress)
+        3.times { |index| burst(canvas, canvas.w * (index + 1) / 4, row + 2, (progress + index * 0.2) % 1, color: [CYAN, PINK, GOLD][index]) }
+        if canvas.w >= 76 && data[:score]
+          canvas.put(3, row + 2, "+#{(data[:score] * Dopairb::Fx.ease_out(progress)).to_i} XP", GOLD, bold: true)
+          canvas.put(canvas.w - 17, row + 2, crop("LV #{data[:level]}  #{data[:rank]}", 16), MINT, bold: true)
+        end
+      when :jackpot
+        12.times do |index|
+          x = (index * 17 + 3) % canvas.w
+          y = row + ((index * 3 + progress * 10) % [room, 1].max)
+          canvas.put(x, y, index.even? ? "$" : "o", [GOLD, PINK, CYAN][index % 3], bold: true)
+        end
+        sprite_width = Art::SPRITES[:slots].map(&:length).max
+        left = middle - sprite_width / 2
+        [room, 8].min.times { |index| canvas.put(left, row + index, " " * sprite_width) }
+        draw_sprite(canvas, :slots, middle, row, progress)
+        if room >= 8
+          [4, 11, 18].each_with_index do |column, index|
+            digit = progress >= 0.5 + index * 0.18 ? 7 : (tick * (index + 2)) % 10
+            canvas.put(left + column, row + 3, digit.to_s, [GOLD, PINK, CYAN][index], bold: true)
+          end
+        end
+      when :grammar_break, :validation_break
+        draw_sprite(canvas, :book, middle, row, progress)
+        [room, 7].min.times do |index|
+          x = middle + (index.even? ? -1 : 1) * (1 + progress * 3).round
+          canvas.put(x, row + index, index.even? ? "/ /" : "\\ \\", PINK, bold: true)
+        end
+      else
+        burst(canvas, middle, row + room / 2, progress)
       end
     end
 
